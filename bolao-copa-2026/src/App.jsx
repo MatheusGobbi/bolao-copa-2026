@@ -790,7 +790,7 @@ export default function App() {
       `}</style>
  
       <header style={S.header}>
-        <div style={S.kicker}>BOLÃO • FIFA WORLD CUP</div>
+        <div style={S.kicker}>BOLÃO • FIFA WORLD CUPa</div>
         <h1 style={S.title}>COPA 2026</h1>
         <div style={S.sub}>EUA · MÉXICO · CANADÁ</div>
       </header>
