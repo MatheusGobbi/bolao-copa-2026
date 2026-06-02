@@ -1,39 +1,103 @@
 // ============================================================
-//  TABELA DA COPA 2026 — fase de grupos (1ª rodada), datas reais
-//  Horários em UTC (o app converte para o fuso de cada pessoa).
-//  16h Brasília = 19:00 UTC. Edite/expanda à vontade.
-//  Alguns confrontos de play-off podem mudar de nome conforme a FIFA.
+//  TABELA DA COPA 2026 — fase de grupos completa (72 jogos)
+//  Horários em UTC (16h Brasília = 19:00 UTC). 3h = diferença Brasília→UTC.
+//  Bandeiras em emoji (funcionam em qualquer celular).
+//  Confrontos de play-off podem ter o nome ajustado pela FIFA.
 // ============================================================
+
+// Bandeira de cada seleção (emoji)
+export const BANDEIRAS = {
+  "México": "🇲🇽", "África do Sul": "🇿🇦", "Coreia do Sul": "🇰🇷", "República Tcheca": "🇨🇿",
+  "Canadá": "🇨🇦", "Bósnia e Herzegovina": "🇧🇦", "Catar": "🇶🇦", "Suíça": "🇨🇭",
+  "Brasil": "🇧🇷", "Marrocos": "🇲🇦", "Haiti": "🇭🇹", "Escócia": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "Estados Unidos": "🇺🇸", "Paraguai": "🇵🇾", "Austrália": "🇦🇺", "Turquia": "🇹🇷",
+  "Alemanha": "🇩🇪", "Curaçao": "🇨🇼", "Costa do Marfim": "🇨🇮", "Equador": "🇪🇨",
+  "Holanda": "🇳🇱", "Japão": "🇯🇵", "Suécia": "🇸🇪", "Tunísia": "🇹🇳",
+  "Bélgica": "🇧🇪", "Egito": "🇪🇬", "Irã": "🇮🇷", "Nova Zelândia": "🇳🇿",
+  "Espanha": "🇪🇸", "Cabo Verde": "🇨🇻", "Arábia Saudita": "🇸🇦", "Uruguai": "🇺🇾",
+  "França": "🇫🇷", "Senegal": "🇸🇳", "Noruega": "🇳🇴", "Iraque": "🇮🇶",
+  "Argentina": "🇦🇷", "Argélia": "🇩🇿", "Áustria": "🇦🇹", "Jordânia": "🇯🇴",
+  "Portugal": "🇵🇹", "Uzbequistão": "🇺🇿", "Colômbia": "🇨🇴", "RD Congo": "🇨🇩",
+  "Inglaterra": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Croácia": "🇭🇷", "Gana": "🇬🇭", "Panamá": "🇵🇦",
+};
+export const bandeira = (time) => BANDEIRAS[time] || "🏳️";
+
 export const JOGOS_OFICIAIS = [
-  // Quinta, 11/06
-  { id: "wc01", grupo: "A", casa: "México",            fora: "África do Sul",        iso: "2026-06-11T19:00:00Z" },
-  { id: "wc02", grupo: "A", casa: "Coreia do Sul",     fora: "República Tcheca",     iso: "2026-06-12T02:00:00Z" },
-  // Sexta, 12/06
-  { id: "wc03", grupo: "B", casa: "Canadá",            fora: "Bósnia e Herzegovina", iso: "2026-06-12T19:00:00Z" },
-  { id: "wc04", grupo: "D", casa: "Estados Unidos",    fora: "Paraguai",             iso: "2026-06-13T01:00:00Z" },
-  // Sábado, 13/06
-  { id: "wc05", grupo: "B", casa: "Catar",             fora: "Suíça",                iso: "2026-06-13T19:00:00Z" },
-  { id: "wc06", grupo: "C", casa: "Brasil",            fora: "Marrocos",             iso: "2026-06-13T22:00:00Z" },
-  { id: "wc07", grupo: "C", casa: "Haiti",             fora: "Escócia",              iso: "2026-06-14T01:00:00Z" },
-  { id: "wc08", grupo: "D", casa: "Austrália",         fora: "Turquia",              iso: "2026-06-14T04:00:00Z" },
-  // Domingo, 14/06
-  { id: "wc09", grupo: "E", casa: "Alemanha",          fora: "Curaçao",              iso: "2026-06-14T17:00:00Z" },
-  { id: "wc10", grupo: "F", casa: "Holanda",           fora: "Japão",                iso: "2026-06-14T20:00:00Z" },
-  { id: "wc11", grupo: "E", casa: "Costa do Marfim",   fora: "Equador",              iso: "2026-06-14T23:00:00Z" },
-  { id: "wc12", grupo: "F", casa: "Suécia",            fora: "Tunísia",              iso: "2026-06-15T02:00:00Z" },
-  // Segunda, 15/06
-  { id: "wc13", grupo: "H", casa: "Espanha",           fora: "Cabo Verde",           iso: "2026-06-15T16:00:00Z" },
-  { id: "wc14", grupo: "G", casa: "Bélgica",           fora: "Egito",                iso: "2026-06-15T19:00:00Z" },
-  { id: "wc15", grupo: "H", casa: "Arábia Saudita",    fora: "Uruguai",              iso: "2026-06-15T22:00:00Z" },
-  { id: "wc16", grupo: "G", casa: "Irã",               fora: "Nova Zelândia",        iso: "2026-06-16T01:00:00Z" },
-  // Terça, 16/06
-  { id: "wc17", grupo: "I", casa: "França",            fora: "Senegal",              iso: "2026-06-16T19:00:00Z" },
-  { id: "wc18", grupo: "I", casa: "Iraque",            fora: "Noruega",              iso: "2026-06-16T22:00:00Z" },
-  { id: "wc19", grupo: "J", casa: "Argentina",         fora: "Argélia",              iso: "2026-06-17T01:00:00Z" },
-  { id: "wc20", grupo: "J", casa: "Áustria",           fora: "Jordânia",             iso: "2026-06-17T04:00:00Z" },
-  // Quarta, 17/06
-  { id: "wc21", grupo: "K", casa: "Portugal",          fora: "RD Congo",             iso: "2026-06-17T17:00:00Z" },
-  { id: "wc22", grupo: "L", casa: "Inglaterra",        fora: "Croácia",              iso: "2026-06-17T20:00:00Z" },
-  { id: "wc23", grupo: "L", casa: "Gana",              fora: "Panamá",               iso: "2026-06-17T23:00:00Z" },
-  { id: "wc24", grupo: "K", casa: "Uzbequistão",       fora: "Colômbia",             iso: "2026-06-18T00:00:00Z" },
+  // ===== 1ª RODADA =====
+  { id: "wc01", grupo: "A", rodada: 1, casa: "México",          fora: "África do Sul",        iso: "2026-06-11T19:00:00Z" },
+  { id: "wc02", grupo: "A", rodada: 1, casa: "Coreia do Sul",   fora: "República Tcheca",     iso: "2026-06-12T02:00:00Z" },
+  { id: "wc03", grupo: "B", rodada: 1, casa: "Canadá",          fora: "Bósnia e Herzegovina", iso: "2026-06-12T19:00:00Z" },
+  { id: "wc04", grupo: "D", rodada: 1, casa: "Estados Unidos",  fora: "Paraguai",             iso: "2026-06-13T01:00:00Z" },
+  { id: "wc05", grupo: "B", rodada: 1, casa: "Catar",           fora: "Suíça",                iso: "2026-06-13T19:00:00Z" },
+  { id: "wc06", grupo: "C", rodada: 1, casa: "Brasil",          fora: "Marrocos",             iso: "2026-06-13T22:00:00Z" },
+  { id: "wc07", grupo: "C", rodada: 1, casa: "Haiti",           fora: "Escócia",              iso: "2026-06-14T01:00:00Z" },
+  { id: "wc08", grupo: "D", rodada: 1, casa: "Austrália",       fora: "Turquia",              iso: "2026-06-14T04:00:00Z" },
+  { id: "wc09", grupo: "E", rodada: 1, casa: "Alemanha",        fora: "Curaçao",              iso: "2026-06-14T17:00:00Z" },
+  { id: "wc10", grupo: "F", rodada: 1, casa: "Holanda",         fora: "Japão",                iso: "2026-06-14T20:00:00Z" },
+  { id: "wc11", grupo: "E", rodada: 1, casa: "Costa do Marfim", fora: "Equador",              iso: "2026-06-14T23:00:00Z" },
+  { id: "wc12", grupo: "F", rodada: 1, casa: "Suécia",          fora: "Tunísia",              iso: "2026-06-15T02:00:00Z" },
+  { id: "wc13", grupo: "H", rodada: 1, casa: "Espanha",         fora: "Cabo Verde",           iso: "2026-06-15T16:00:00Z" },
+  { id: "wc14", grupo: "G", rodada: 1, casa: "Bélgica",         fora: "Egito",                iso: "2026-06-15T19:00:00Z" },
+  { id: "wc15", grupo: "H", rodada: 1, casa: "Arábia Saudita",  fora: "Uruguai",              iso: "2026-06-15T22:00:00Z" },
+  { id: "wc16", grupo: "G", rodada: 1, casa: "Irã",             fora: "Nova Zelândia",        iso: "2026-06-16T01:00:00Z" },
+  { id: "wc17", grupo: "I", rodada: 1, casa: "França",          fora: "Senegal",              iso: "2026-06-16T19:00:00Z" },
+  { id: "wc18", grupo: "I", rodada: 1, casa: "Iraque",          fora: "Noruega",              iso: "2026-06-16T22:00:00Z" },
+  { id: "wc19", grupo: "J", rodada: 1, casa: "Argentina",       fora: "Argélia",              iso: "2026-06-17T01:00:00Z" },
+  { id: "wc20", grupo: "J", rodada: 1, casa: "Áustria",         fora: "Jordânia",             iso: "2026-06-17T04:00:00Z" },
+  { id: "wc21", grupo: "K", rodada: 1, casa: "Portugal",        fora: "RD Congo",             iso: "2026-06-17T17:00:00Z" },
+  { id: "wc22", grupo: "L", rodada: 1, casa: "Inglaterra",      fora: "Croácia",              iso: "2026-06-17T20:00:00Z" },
+  { id: "wc23", grupo: "L", rodada: 1, casa: "Gana",            fora: "Panamá",               iso: "2026-06-17T23:00:00Z" },
+  { id: "wc24", grupo: "K", rodada: 1, casa: "Uzbequistão",     fora: "Colômbia",             iso: "2026-06-18T00:00:00Z" },
+
+  // ===== 2ª RODADA =====
+  { id: "wc25", grupo: "A", rodada: 2, casa: "República Tcheca", fora: "África do Sul",        iso: "2026-06-18T16:00:00Z" },
+  { id: "wc26", grupo: "B", rodada: 2, casa: "Suíça",            fora: "Bósnia e Herzegovina", iso: "2026-06-18T19:00:00Z" },
+  { id: "wc27", grupo: "B", rodada: 2, casa: "Canadá",           fora: "Catar",                iso: "2026-06-18T22:00:00Z" },
+  { id: "wc28", grupo: "A", rodada: 2, casa: "México",           fora: "Coreia do Sul",        iso: "2026-06-19T01:00:00Z" },
+  { id: "wc29", grupo: "D", rodada: 2, casa: "Estados Unidos",   fora: "Austrália",            iso: "2026-06-19T19:00:00Z" },
+  { id: "wc30", grupo: "C", rodada: 2, casa: "Escócia",          fora: "Marrocos",             iso: "2026-06-19T22:00:00Z" },
+  { id: "wc31", grupo: "C", rodada: 2, casa: "Brasil",           fora: "Haiti",                iso: "2026-06-20T00:30:00Z" },
+  { id: "wc32", grupo: "D", rodada: 2, casa: "Turquia",          fora: "Paraguai",             iso: "2026-06-20T03:00:00Z" },
+  { id: "wc33", grupo: "F", rodada: 2, casa: "Holanda",          fora: "Suécia",               iso: "2026-06-20T17:00:00Z" },
+  { id: "wc34", grupo: "E", rodada: 2, casa: "Alemanha",         fora: "Costa do Marfim",      iso: "2026-06-20T20:00:00Z" },
+  { id: "wc35", grupo: "E", rodada: 2, casa: "Equador",          fora: "Curaçao",              iso: "2026-06-21T00:00:00Z" },
+  { id: "wc36", grupo: "F", rodada: 2, casa: "Tunísia",          fora: "Japão",                iso: "2026-06-21T02:00:00Z" },
+  { id: "wc37", grupo: "H", rodada: 2, casa: "Espanha",          fora: "Arábia Saudita",       iso: "2026-06-21T16:00:00Z" },
+  { id: "wc38", grupo: "G", rodada: 2, casa: "Bélgica",          fora: "Irã",                  iso: "2026-06-21T19:00:00Z" },
+  { id: "wc39", grupo: "H", rodada: 2, casa: "Uruguai",          fora: "Cabo Verde",           iso: "2026-06-21T22:00:00Z" },
+  { id: "wc40", grupo: "G", rodada: 2, casa: "Nova Zelândia",    fora: "Egito",                iso: "2026-06-22T01:00:00Z" },
+  { id: "wc41", grupo: "J", rodada: 2, casa: "Argentina",        fora: "Áustria",              iso: "2026-06-22T17:00:00Z" },
+  { id: "wc42", grupo: "I", rodada: 2, casa: "França",           fora: "Iraque",               iso: "2026-06-22T21:00:00Z" },
+  { id: "wc43", grupo: "I", rodada: 2, casa: "Noruega",          fora: "Senegal",              iso: "2026-06-23T00:00:00Z" },
+  { id: "wc44", grupo: "J", rodada: 2, casa: "Jordânia",         fora: "Argélia",              iso: "2026-06-23T03:00:00Z" },
+  { id: "wc45", grupo: "K", rodada: 2, casa: "Portugal",         fora: "Uzbequistão",          iso: "2026-06-23T17:00:00Z" },
+  { id: "wc46", grupo: "L", rodada: 2, casa: "Inglaterra",       fora: "Gana",                 iso: "2026-06-23T20:00:00Z" },
+  { id: "wc47", grupo: "L", rodada: 2, casa: "Panamá",           fora: "Croácia",              iso: "2026-06-23T23:00:00Z" },
+  { id: "wc48", grupo: "K", rodada: 2, casa: "Colômbia",         fora: "RD Congo",             iso: "2026-06-24T02:00:00Z" },
+
+  // ===== 3ª RODADA (jogos simultâneos por grupo) =====
+  { id: "wc49", grupo: "B", rodada: 3, casa: "Suíça",            fora: "Canadá",               iso: "2026-06-24T16:00:00Z" },
+  { id: "wc50", grupo: "B", rodada: 3, casa: "Bósnia e Herzegovina", fora: "Catar",            iso: "2026-06-24T16:00:00Z" },
+  { id: "wc51", grupo: "C", rodada: 3, casa: "Escócia",          fora: "Brasil",               iso: "2026-06-24T22:00:00Z" },
+  { id: "wc52", grupo: "C", rodada: 3, casa: "Marrocos",         fora: "Haiti",                iso: "2026-06-24T22:00:00Z" },
+  { id: "wc53", grupo: "A", rodada: 3, casa: "República Tcheca", fora: "México",               iso: "2026-06-25T01:00:00Z" },
+  { id: "wc54", grupo: "A", rodada: 3, casa: "África do Sul",    fora: "Coreia do Sul",        iso: "2026-06-25T01:00:00Z" },
+  { id: "wc55", grupo: "E", rodada: 3, casa: "Equador",          fora: "Alemanha",             iso: "2026-06-25T20:00:00Z" },
+  { id: "wc56", grupo: "E", rodada: 3, casa: "Curaçao",          fora: "Costa do Marfim",      iso: "2026-06-25T20:00:00Z" },
+  { id: "wc57", grupo: "F", rodada: 3, casa: "Japão",            fora: "Suécia",               iso: "2026-06-25T23:00:00Z" },
+  { id: "wc58", grupo: "F", rodada: 3, casa: "Tunísia",          fora: "Holanda",              iso: "2026-06-25T23:00:00Z" },
+  { id: "wc59", grupo: "D", rodada: 3, casa: "Turquia",          fora: "Estados Unidos",       iso: "2026-06-26T02:00:00Z" },
+  { id: "wc60", grupo: "D", rodada: 3, casa: "Paraguai",         fora: "Austrália",            iso: "2026-06-26T02:00:00Z" },
+  { id: "wc61", grupo: "I", rodada: 3, casa: "Noruega",          fora: "França",               iso: "2026-06-26T19:00:00Z" },
+  { id: "wc62", grupo: "I", rodada: 3, casa: "Senegal",          fora: "Iraque",               iso: "2026-06-26T19:00:00Z" },
+  { id: "wc63", grupo: "H", rodada: 3, casa: "Cabo Verde",       fora: "Arábia Saudita",       iso: "2026-06-27T00:00:00Z" },
+  { id: "wc64", grupo: "H", rodada: 3, casa: "Uruguai",          fora: "Espanha",              iso: "2026-06-27T00:00:00Z" },
+  { id: "wc65", grupo: "G", rodada: 3, casa: "Egito",            fora: "Irã",                  iso: "2026-06-27T03:00:00Z" },
+  { id: "wc66", grupo: "G", rodada: 3, casa: "Nova Zelândia",    fora: "Bélgica",              iso: "2026-06-27T03:00:00Z" },
+  { id: "wc67", grupo: "J", rodada: 3, casa: "Argélia",          fora: "Argentina",            iso: "2026-06-27T19:00:00Z" },
+  { id: "wc68", grupo: "J", rodada: 3, casa: "Jordânia",         fora: "Áustria",              iso: "2026-06-27T19:00:00Z" },
+  { id: "wc69", grupo: "K", rodada: 3, casa: "RD Congo",         fora: "Portugal",             iso: "2026-06-27T22:00:00Z" },
+  { id: "wc70", grupo: "K", rodada: 3, casa: "Colômbia",         fora: "Uzbequistão",          iso: "2026-06-27T22:00:00Z" },
+  { id: "wc71", grupo: "L", rodada: 3, casa: "Croácia",          fora: "Gana",                 iso: "2026-06-28T01:00:00Z" },
+  { id: "wc72", grupo: "L", rodada: 3, casa: "Panamá",           fora: "Inglaterra",           iso: "2026-06-28T01:00:00Z" },
 ];
