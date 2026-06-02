@@ -5,7 +5,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 // 1) Cole aqui a "Project URL"
-const SUPABASE_URL = "https://cfzgvstgqbuuvyxxmvqe.supabase.co/rest/v1/";
+const SUPABASE_URL = "https://cfzgvstgqbuuvyxxmvqe.supabase.co";
 
 // 2) Cole aqui a chave "anon public"
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmemd2c3RncWJ1dXZ5eHhtdnFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTkyNTksImV4cCI6MjA5NTk5NTI1OX0.T7dB_F3il0o6plin8n4p4WSxO9xG3Ch2BavMqZy5DMw";
