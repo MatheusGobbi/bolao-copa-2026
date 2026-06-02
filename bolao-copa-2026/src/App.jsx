@@ -430,6 +430,117 @@ Se preferir não depender da API agora e já deixar a tabela "de verdade" montad
 
 App
 Código · JSX 
+esta com algum erro, pois quando recarrego a tela ele aparece os jogos do grupo A e logo apos some e aparece esse jogo da copa anterior como na imagem, gostaria tambem de ajustar o ranking e exibir todos os cadastrados la mesmo zerados de pontos, e quero que ajuste o visual para aparecer todos os jogos disponiveis do para palpite com deus grupos e informações do jogo
+
+16:51
+Entendi os três pontos. Deixa eu resolver na ordem, porque o primeiro é um bug real e importante.
+
+O que está acontecendo no "pisca": ao carregar, aparecem os jogos de exemplo (Grupo A) e logo depois a sincronização da API sobrescreve com o jogo antigo. Isso indica que o filtro de data que adicionei não está pegando aquele jogo Argentina×France — provavelmente porque a data dele vem num formato que meu filtro não interpretou, então ele passou como "2026+". Vou tornar o filtro mais robusto e, principalmente, mudar a estratégia: em vez de depender 100% da API instável, vou montar a tabela real da Copa 2026 como base fixa e usar a API só pra completar placares. Assim acaba o pisca e os jogos errados.
+
+Antes de reescrever, preciso confirmar a tabela real. Deixa eu buscar os grupos e jogos oficiais da Copa 2026.
+
+
+Pesquisou na web
+Pesquisou na web
+O sorteio já aconteceu (foi em 5 de dezembro de 2025). Sei que o Brasil caiu no Grupo C com Marrocos, Haiti e Escócia, e que a abertura é México × África do Sul em 11/06. Mas não tenho a tabela completa dos 12 grupos de forma confiável. Vou buscar a lista completa dos grupos.
+
+
+Fetched: Veja como ficaram os grupos da Copa do Mundo de 2026 - Nexo Jornal
+Fetched: Veja como ficaram os grupos da Copa do Mundo de 2026 - Nexo Jornal
+A página tem paywall e não trouxe o conteúdo. Deixa eu buscar a tabela completa dos grupos numa fonte aberta.
+
+
+Pesquisou na web
+Pesquisou na web
+Agora tenho os 12 grupos completos de fontes confiáveis. Os grupos da Copa 2026 ficaram: A) México, África do Sul, Coreia do Sul e o play-off europeu D; B) Canadá, Catar, Suíça e play-off europeu A; C) Brasil, Marrocos, Haiti e Escócia; D) Estados Unidos, Paraguai, Austrália e play-off europeu C; E) Alemanha, Curaçao, Costa do Marfim e Equador; F) Holanda, Japão, Tunísia e play-off europeu B; G) Bélgica, Egito, Irã e Nova Zelândia; H) Espanha, Cabo Verde, Arábia Saudita e Uruguai; I) França, Senegal, Noruega e a repescagem mundial 2; J) Argentina, Argélia, Áustria e Jordânia; K) Portugal, Uzbequistão, Colômbia e repescagem mundial 1; L) Inglaterra, Croácia, Gana e Panamá. 
+soccerway
+
+Como a repescagem de março já definiu as últimas vagas, vou preencher os play-offs com base nisso, mas vou deixar claro no código que alguns são as seleções prováveis.
+
+Vou mudar a estratégia inteira para resolver seus três pedidos de uma vez: tabela fixa de jogos da fase de grupos embutida no app (acaba o pisca e os jogos errados), ranking mostrando todos os cadastrados mesmo zerados, e visual reorganizado por grupos. A API fica só pra completar placares dos jogos reais (casando por nome dos times), nunca mais sobrescrevendo a lista.
+
+Deixa eu primeiro confirmar as datas dos jogos da fase de grupos.
+
+
+Fetched: Tabela completa da Copa do Mundo 2026: confira datas, horários e jogos – Money Times
+Fetched: Tabela completa da Copa do Mundo 2026: confira datas, horários e jogos – Money Times
+Tenho a 1ª rodada completa com datas e horários de Brasília, e os grupos definidos. Isso já dá uma base sólida e real. A repescagem definiu: Grupo B com Bósnia (play-off A), D com Turquia (play-off C), F com Suécia (play-off B), I com Iraque (repescagem 2), K com RD Congo (repescagem 1). O play-off D do Grupo A ainda aparece como Rep. Tcheca na 1ª rodada.
+
+Vou montar a tabela da 1ª rodada (todos os 12 grupos) com datas reais embutida no app. Isso resolve o pisca e os jogos errados de uma vez, e dá uma base honesta de jogos reais pra palpitar. Vou reescrever o App.jsx inteiro com a nova arquitetura.
+
+
+Criando arquivo separado com a tabela oficial de jogos da Copa
+Criando arquivo separado com a tabela oficial de jogos da Copa
+Agora vou reescrever o App.jsx com a nova arquitetura: jogos vêm da tabela fixa (nunca somem nem piscam), API só completa placares casando por nome de time, ranking mostra todos os cadastrados mesmo zerados, e jogos agrupados por grupo na tela.
+
+
+Reescrevendo App.jsx com tabela fixa, ranking completo e visual por grupos
+Reescrevendo App.jsx com tabela fixa, ranking completo e visual por grupos
+Vou validar a sintaxe pra garantir que não há erro antes de você subir.
+
+
+Validando a sintaxe do JSX com esbuild
+Validando a sintaxe do JSX com esbuild
+Foi só por eu ter passado dois arquivos juntos. Vou validar cada um separado.
+
+
+Validando sintaxe de cada arquivo separadamente
+Validando sintaxe de cada arquivo separadamente
+Sintaxe limpa nos dois. Vou gerar o zip atualizado e apresentar os dois arquivos que você precisa atualizar no GitHub.
+
+
+Executou um comando, leu um arquivo
+Executou um comando, leu um arquivo
+Reescrevi resolvendo os três pontos. Mudei a estratégia de fundo: em vez de depender da API instável pra listar os jogos, agora os jogos vêm de uma tabela fixa da Copa 2026 embutida no app, e a API só completa os placares.
+
+O bug do "pisca" (jogos do grupo A somem e aparece o jogo de 2022): resolvido. A causa era a API sobrescrevendo a lista com dados antigos. Agora a lista de jogos é fixa e a API nunca mexe nela — só preenche o placar de cada jogo casando pelo nome dos times (e filtrando só 2026+). Aquele Argentina×France de 2022 não aparece mais.
+
+Ranking com todos os cadastrados, mesmo zerados: feito. Agora ele lê a lista de usuários do banco e mostra todo mundo que criou conta, mesmo com 0 ponto e 0 palpite. Mostra também a contagem de participantes no topo.
+
+Visual por grupos: os jogos agora aparecem organizados com um cabeçalho "GRUPO A", "GRUPO B" etc., cada jogo com data, dia da semana e horário (convertido pro fuso de quem abre). Vale nas telas de Palpites, Resultados e Admin.
+
+Os jogos que coloquei são a 1ª rodada real da fase de grupos — os 24 jogos de 11 a 17 de junho, com as seleções e horários oficiais (Brasil × Marrocos em 13/06, Argentina × Argélia, México × África do Sul na abertura, etc.).
+
+Para atualizar, são dois arquivos:
+
+O src/App.jsx (substitua o conteúdo inteiro, como antes) e um arquivo novo src/jogos.js, que você precisa criar na pasta src do GitHub (Add file → Create new file → nome src/jogos.js → cole o conteúdo). Sem esse arquivo novo, o App.jsx não funciona, porque ele importa os jogos de lá. Depois é só commitar; a Vercel republica sozinha em ~1 min, e recarregue com Ctrl+Shift+R.
+
+Dois pontos honestos: incluí só a 1ª rodada (24 jogos) — dá pra eu adicionar a 2ª e 3ª rodadas depois, é só expandir o jogos.js. E alguns confrontos de play-off europeu (como o Grupo A) podem ter o nome ajustado pela FIFA; se algum vier diferente, é fácil corrigir no jogos.js. Quer que eu complete as três rodadas da fase de grupos?
+
+
+App
+Código · JSX 
+
+Jogos
+JS 
+
+Bolao copa 2026
+ZIP 
+1780430117866_image.png
+antes de colocar as alteracoes acima tirei esse print para ajudar, parece um erro nas requests ainda
+
+16:55
+Boa, esse print ajuda muito — e revela duas coisas separadas.
+
+Primeiro, o erro do console: voltou aquele /rest/v1/rest/v1/ duplicado nas requisições. Isso significa que a correção da URL no config.js foi desfeita, ou o deploy que está no ar é uma versão antiga. Olha a URL com erro: ...supabase.co/rest/v1/rest/v1/palpites — o /rest/v1 está lá de novo. Por isso os palpites e resultados não carregam.
+
+Segundo (importante): esse print é da versão antiga — você mesmo disse que tirou "antes de colocar as alterações". Por isso ainda aparece "Grupo 200 / Argentina × France" e o pisca. As alterações novas que te mandei (tabela fixa, sem o jogo de 2022) ainda não estão nesse deploy. Então não se preocupe com o jogo errado por enquanto: ele some quando você subir o App.jsx + jogos.js novos.
+
+A ordem certa pra resolver tudo de uma vez:
+
+Primeiro conserte a URL no config.js de novo. Abra src/config.js no GitHub, e confirme que a linha está exatamente assim, sem /rest/v1 no final e sem barra:
+
+const SUPABASE_URL = "https://cfzgvstgqbuuvyxxmvqe.supabase.co";
+
+Se estiver com qualquer coisa depois do .co, apague. (Confere se é esse mesmo o início da sua URL — pela imagem, parece cfzgvstgqbuuvyxxmvqe.)
+
+Depois suba as alterações novas: substitua o App.jsx e crie o src/jogos.js (os dois arquivos que te passei na mensagem anterior).
+
+Pode fazer os três numa tacada só (config + App + jogos) e commitar. A Vercel republica sozinha, e aí recarregue com Ctrl+Shift+R.
+
+Uma pergunta pra eu garantir que a correção da URL não se perca de novo: quando você corrigiu a URL antes e funcionou, você editou direto no GitHub ou no seu computador? Pergunto porque, se você tem uma cópia no PC e sobe por lá, a versão antiga (com o /rest/v1) pode estar sobrescrevendo a corrigida a cada upload. Saber isso evita o problema voltar uma terceira vez.
+
+
 
 Quer ser notificado quando Claude responder?
 
@@ -443,6 +554,7 @@ raw
 App · JSX
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase, ADMIN_PASSWORD, TRAVA_MINUTOS, LEAGUE_ID, API_KEY, PONTOS } from "./config";
+import { JOGOS_OFICIAIS } from "./jogos";
  
 const COLS = {
   bg: "#0a1f0f", card: "#11331a", cardAlt: "#0d2814", line: "#1d5230",
@@ -451,11 +563,31 @@ const COLS = {
 };
 const API_BASE = `https://www.thesportsdb.com/api/v1/json/${API_KEY}`;
  
-const JOGOS_FALLBACK = [
-  { id: "fb1", grupo: "A", casa: "México", fora: "A definir", iso: "2026-06-11T20:00:00Z", apiResultado: null },
-  { id: "fb2", grupo: "B", casa: "Canadá", fora: "A definir", iso: "2026-06-12T22:00:00Z", apiResultado: null },
-  { id: "fb3", grupo: "F", casa: "Brasil", fora: "A definir", iso: "2026-06-13T19:00:00Z", apiResultado: null },
-];
+// normaliza nome de time p/ casar com a API (sem acento, minúsculo)
+function norm(s) {
+  return (s || "").toString().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, "");
+}
+// apelidos p/ casar nomes diferentes entre nossa tabela e a TheSportsDB (em inglês)
+const APELIDOS = {
+  mexico: "mexico", africadosul: "southafrica", coreiadosul: "southkorea",
+  republicatcheca: "czechrepublic", canada: "canada", bosniaeherzegovina: "bosnia",
+  estadosunidos: "usa", paraguai: "paraguay", catar: "qatar", suica: "switzerland",
+  brasil: "brazil", marrocos: "morocco", haiti: "haiti", escocia: "scotland",
+  australia: "australia", turquia: "turkey", alemanha: "germany", curacao: "curacao",
+  holanda: "netherlands", japao: "japan", costadomarfim: "ivorycoast",
+  equador: "ecuador", suecia: "sweden", tunisia: "tunisia", espanha: "spain",
+  caboverde: "capeverde", belgica: "belgium", egito: "egypt",
+  arabiasaudita: "saudiarabia", uruguai: "uruguay", ira: "iran",
+  novazelandia: "newzealand", franca: "france", senegal: "senegal",
+  iraque: "iraq", noruega: "norway", argentina: "argentina", argelia: "algeria",
+  austria: "austria", jordania: "jordan", portugal: "portugal", rdcongo: "drcongo",
+  inglaterra: "england", croacia: "croatia", gana: "ghana", panama: "panama",
+  uzbequistao: "uzbekistan", colombia: "colombia",
+};
+const chaveTime = (s) => APELIDOS[norm(s)] || norm(s);
+const chaveJogo = (casa, fora) => `${chaveTime(casa)}__${chaveTime(fora)}`;
  
 function calcPontos(palpite, resultado) {
   if (!resultado || resultado.casa == null || resultado.fora == null) return null;
@@ -470,29 +602,12 @@ function calcPontos(palpite, resultado) {
   return PONTOS.erro;
 }
  
-function parseEvento(ev) {
-  let iso = null;
-  if (ev.strTimestamp) iso = ev.strTimestamp.replace(" ", "T") + (ev.strTimestamp.includes("Z") ? "" : "Z");
-  else if (ev.dateEvent) iso = `${ev.dateEvent}T${ev.strTime || "00:00:00"}Z`;
-  return {
-    id: ev.idEvent,
-    grupo: (ev.strGroup || ev.intRound || "").toString().replace(/group/i, "").trim() || "—",
-    casa: ev.strHomeTeam || "A definir",
-    fora: ev.strAwayTeam || "A definir",
-    iso,
-    apiResultado:
-      ev.intHomeScore != null && ev.intHomeScore !== "" && ev.intAwayScore != null && ev.intAwayScore !== ""
-        ? { casa: Number(ev.intHomeScore), fora: Number(ev.intAwayScore) } : null,
-  };
-}
- 
 function fmtData(iso) {
   if (!iso) return "data a definir";
   const d = new Date(iso);
   if (isNaN(d)) return "data a definir";
-  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
- 
 function jogoFechado(jogo, resultado) {
   if (resultado && resultado.casa != null && resultado.fora != null) return true;
   if (!jogo.iso) return false;
@@ -503,10 +618,11 @@ function jogoFechado(jogo, resultado) {
  
 export default function App() {
   const [tab, setTab] = useState("palpites");
-  const [jogos, setJogos] = useState(JOGOS_FALLBACK);
+  const jogos = JOGOS_OFICIAIS; // tabela fixa — não pisca nem some
   const [resultadosManuais, setResultadosManuais] = useState({});
-  const [apiResultados, setApiResultados] = useState({});
-  const [palpitesTodos, setPalpitesTodos] = useState({}); // { nome: { jogoId: {casa,fora} } }
+  const [apiResultados, setApiResultados] = useState({}); // casados por nome
+  const [palpitesTodos, setPalpitesTodos] = useState({});
+  const [usuarios, setUsuarios] = useState([]); // todos os cadastrados
  
   const [nome, setNome] = useState("");
   const [senha, setSenha] = useState("");
@@ -521,12 +637,14 @@ export default function App() {
   const [, force] = useState(0);
  
   const resultadoFinal = useCallback(
-    (jogoId) => resultadosManuais[jogoId] || apiResultados[jogoId] || null,
+    (jogoId, casa, fora) =>
+      resultadosManuais[jogoId] || apiResultados[chaveJogo(casa, fora)] || null,
     [resultadosManuais, apiResultados]
   );
  
-  // ---- Carrega palpites e resultados manuais do Supabase ----
   const carregarBanco = useCallback(async () => {
+    const { data: us } = await supabase.from("usuarios").select("nome");
+    if (us) setUsuarios(us.map(u => u.nome));
     const { data: pal } = await supabase.from("palpites").select("*");
     if (pal) {
       const todos = {};
@@ -544,38 +662,24 @@ export default function App() {
     }
   }, []);
  
-  // ---- Sincroniza jogos + resultados da TheSportsDB ----
+  // Sincroniza SÓ resultados da API, casando por nome — nunca mexe na lista de jogos
   const sincronizar = useCallback(async () => {
     setSyncStatus("sincronizando");
     try {
-      const prox = await fetch(`${API_BASE}/eventsnextleague.php?id=${LEAGUE_ID}`).then(r => r.json()).catch(() => null);
-      const pass = await fetch(`${API_BASE}/eventspastleague.php?id=${LEAGUE_ID}`).then(r => r.json()).catch(() => null);
-      const lista = [];
-      if (prox?.events) lista.push(...prox.events);
-      if (pass?.events) lista.push(...pass.events);
-      if (lista.length) {
-        const porId = {};
-        for (const ev of lista) { const j = parseEvento(ev); porId[j.id] = j; }
-        // Filtra para manter só jogos de 2026 em diante (descarta históricos da API)
-        const INICIO_COPA = new Date("2026-01-01T00:00:00Z").getTime();
-        const arr = Object.values(porId)
-          .filter(j => {
-            if (!j.iso) return false;            // sem data confiável → fora
-            const t = new Date(j.iso).getTime();
-            return !isNaN(t) && t >= INICIO_COPA; // só 2026+
-          })
-          .sort((a, b) => (a.iso || "").localeCompare(b.iso || ""));
-        if (arr.length) {
-          setJogos(arr);
-          const ar = {};
-          for (const j of arr) if (j.apiResultado) ar[j.id] = j.apiResultado;
-          setApiResultados(ar);
-          setSyncStatus("ok");
-        } else {
-          // API só trouxe jogos antigos → mantém os exemplos até a tabela 2026 sair
-          setSyncStatus("sem-dados");
+      const passados = await fetch(`${API_BASE}/eventspastleague.php?id=${LEAGUE_ID}`).then(r => r.json()).catch(() => null);
+      const ar = {};
+      if (passados?.events) {
+        for (const ev of passados.events) {
+          if (ev.intHomeScore == null || ev.intHomeScore === "" || ev.intAwayScore == null || ev.intAwayScore === "") continue;
+          // só jogos de 2026 em diante
+          const dt = ev.dateEvent ? new Date(`${ev.dateEvent}T00:00:00Z`).getTime() : NaN;
+          if (isNaN(dt) || dt < new Date("2026-01-01T00:00:00Z").getTime()) continue;
+          const k = chaveJogo(ev.strHomeTeam, ev.strAwayTeam);
+          ar[k] = { casa: Number(ev.intHomeScore), fora: Number(ev.intAwayScore) };
         }
-      } else setSyncStatus("sem-dados");
+      }
+      setApiResultados(ar);
+      setSyncStatus(Object.keys(ar).length ? "ok" : "sem-resultados");
     } catch { setSyncStatus("erro"); }
   }, []);
  
@@ -590,8 +694,6 @@ export default function App() {
   }, [carregarBanco, sincronizar]);
  
   useEffect(() => { const t = setInterval(() => force(n => n + 1), 30000); return () => clearInterval(t); }, []);
- 
-  // recarrega palpites a cada 25s para ver os dos colegas em tempo quase real
   useEffect(() => {
     if (!logado) return;
     const t = setInterval(carregarBanco, 25000);
@@ -609,9 +711,8 @@ export default function App() {
     setCarregandoAuth(false);
     if (error) { setAuthMsg("Erro ao criar conta."); return; }
     localStorage.setItem("bolao:auth", JSON.stringify({ nome: n }));
-    setLogado(true);
+    setLogado(true); carregarBanco();
   }
- 
   async function entrar() {
     const n = nome.trim(); if (!n || !senha) { setAuthMsg("Preencha nome e senha."); return; }
     setCarregandoAuth(true); setAuthMsg("");
@@ -620,14 +721,9 @@ export default function App() {
     if (!u) { setAuthMsg("Conta não encontrada. Crie uma conta."); return; }
     if (u.senha !== senha) { setAuthMsg("Senha incorreta."); return; }
     localStorage.setItem("bolao:auth", JSON.stringify({ nome: n }));
-    setLogado(true);
-    carregarBanco();
+    setLogado(true); carregarBanco();
   }
- 
-  function sair() {
-    localStorage.removeItem("bolao:auth");
-    setLogado(false); setIsAdmin(false); setSenha("");
-  }
+  function sair() { localStorage.removeItem("bolao:auth"); setLogado(false); setIsAdmin(false); setSenha(""); }
  
   async function salvarPalpite(jogoId, campo, valor) {
     const v = valor === "" ? null : Number(valor);
@@ -639,7 +735,6 @@ export default function App() {
       { onConflict: "nome,jogo_id" }
     );
   }
- 
   async function salvarResultadoManual(jogoId, campo, valor) {
     const v = valor === "" ? null : Number(valor);
     const atual = resultadosManuais[jogoId] || { casa: null, fora: null };
@@ -655,16 +750,25 @@ export default function App() {
     }
   }
  
+  // Ranking: TODOS os cadastrados, mesmo zerados
   const ranking = useMemo(() => {
-    return Object.keys(palpitesTodos).map((jogador) => {
+    return usuarios.map((jogador) => {
       let total = 0, exatos = 0, jogados = 0;
+      const pal = palpitesTodos[jogador] || {};
       for (const jg of jogos) {
-        const p = calcPontos(palpitesTodos[jogador][jg.id], resultadoFinal(jg.id));
+        const p = calcPontos(pal[jg.id], resultadoFinal(jg.id, jg.casa, jg.fora));
         if (p != null) { total += p; jogados++; if (p === PONTOS.exato) exatos++; }
       }
       return { jogador, total, exatos, jogados };
-    }).sort((a, b) => b.total - a.total || b.exatos - a.exatos);
-  }, [palpitesTodos, jogos, resultadoFinal]);
+    }).sort((a, b) => b.total - a.total || b.exatos - a.exatos || a.jogador.localeCompare(b.jogador));
+  }, [usuarios, palpitesTodos, jogos, resultadoFinal]);
+ 
+  // Agrupa jogos por grupo para a tela de palpites
+  const porGrupo = useMemo(() => {
+    const g = {};
+    for (const jg of jogos) { (g[jg.grupo] = g[jg.grupo] || []).push(jg); }
+    return Object.keys(g).sort().map(k => ({ grupo: k, jogos: g[k] }));
+  }, [jogos]);
  
   if (loading) return (
     <div style={{ ...S.app, display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
@@ -672,7 +776,7 @@ export default function App() {
     </div>
   );
  
-  const syncLabel = { sincronizando: "🔄 sincronizando…", ok: "✓ jogos atualizados", "sem-dados": "tabela ainda não publicada", erro: "sem conexão", "": "" }[syncStatus];
+  const syncLabel = { sincronizando: "🔄 buscando resultados…", ok: "✓ resultados atualizados", "sem-resultados": "aguardando 1º resultado", erro: "sem conexão" , "": "" }[syncStatus];
  
   return (
     <div style={S.app}>
@@ -724,38 +828,46 @@ export default function App() {
           <main style={S.wrap}>
             {tab === "palpites" && (
               <div className="fade">
-                <p style={S.note}>Palpites fecham {TRAVA_MINUTOS} min antes de cada jogo. Salva sozinho.</p>
-                {jogos.map(jg => {
-                  const p = meusPalpites[jg.id] || { casa: null, fora: null };
-                  const res = resultadoFinal(jg.id);
-                  const fechado = jogoFechado(jg, res);
-                  const tem = res && res.casa != null && res.fora != null;
-                  const pts = calcPontos(p, res);
-                  return (
-                    <div key={jg.id} style={S.match}>
-                      <div style={S.mTop}><span style={S.grp}>Grupo {jg.grupo}</span><span style={S.dt}>{fmtData(jg.iso)}{fechado && !tem ? " · fechado" : ""}</span></div>
-                      <div style={S.mRow}>
-                        <span style={S.team}>{jg.casa}</span>
-                        <input type="number" min="0" style={{ ...S.sc, opacity: fechado ? .5 : 1 }} value={p.casa ?? ""} disabled={fechado} onChange={e => salvarPalpite(jg.id, "casa", e.target.value)} />
-                        <span style={S.x}>×</span>
-                        <input type="number" min="0" style={{ ...S.sc, opacity: fechado ? .5 : 1 }} value={p.fora ?? ""} disabled={fechado} onChange={e => salvarPalpite(jg.id, "fora", e.target.value)} />
-                        <span style={{ ...S.team, textAlign: "right" }}>{jg.fora}</span>
-                      </div>
-                      {tem && (
-                        <div style={S.resLine}>Final: <strong>{res.casa} × {res.fora}</strong>
-                          <span style={{ ...S.badge, background: pts === PONTOS.exato ? COLS.green : pts > 0 ? COLS.goldDim : COLS.red }}>{pts != null ? `+${pts} pts` : "sem palpite"}</span>
+                <p style={S.note}>Fase de grupos · 1ª rodada. Palpites fecham {TRAVA_MINUTOS} min antes de cada jogo. Salva sozinho.</p>
+                {porGrupo.map(({ grupo, jogos: js }) => (
+                  <div key={grupo}>
+                    <div style={S.groupHead}>GRUPO {grupo}</div>
+                    {js.map(jg => {
+                      const p = meusPalpites[jg.id] || { casa: null, fora: null };
+                      const res = resultadoFinal(jg.id, jg.casa, jg.fora);
+                      const fechado = jogoFechado(jg, res);
+                      const tem = res && res.casa != null && res.fora != null;
+                      const pts = calcPontos(p, res);
+                      return (
+                        <div key={jg.id} style={S.match}>
+                          <div style={S.mTop}>
+                            <span style={S.dt}>{fmtData(jg.iso)}</span>
+                            {fechado && !tem && <span style={S.lock}>fechado</span>}
+                          </div>
+                          <div style={S.mRow}>
+                            <span style={S.team}>{jg.casa}</span>
+                            <input type="number" min="0" style={{ ...S.sc, opacity: fechado ? .5 : 1 }} value={p.casa ?? ""} disabled={fechado} onChange={e => salvarPalpite(jg.id, "casa", e.target.value)} />
+                            <span style={S.x}>×</span>
+                            <input type="number" min="0" style={{ ...S.sc, opacity: fechado ? .5 : 1 }} value={p.fora ?? ""} disabled={fechado} onChange={e => salvarPalpite(jg.id, "fora", e.target.value)} />
+                            <span style={{ ...S.team, textAlign: "right" }}>{jg.fora}</span>
+                          </div>
+                          {tem && (
+                            <div style={S.resLine}>Final: <strong>{res.casa} × {res.fora}</strong>
+                              <span style={{ ...S.badge, background: pts === PONTOS.exato ? COLS.green : pts > 0 ? COLS.goldDim : COLS.red }}>{pts != null ? `+${pts} pts` : "sem palpite"}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             )}
  
             {tab === "ranking" && (
               <div className="fade">
-                <p style={S.note}>Classificação geral</p>
-                {ranking.length === 0 && <p style={S.empty}>Ninguém palpitou ainda.</p>}
+                <p style={S.note}>Classificação geral · {ranking.length} participante(s)</p>
+                {ranking.length === 0 && <p style={S.empty}>Nenhum participante ainda.</p>}
                 {ranking.map((r, i) => (
                   <div key={r.jogador} style={{ ...S.rk, ...(r.jogador === nome ? S.rkMe : {}) }}>
                     <span style={{ ...S.rkPos, color: i===0?COLS.gold:i===1?"#cfd8d2":i===2?"#c08a4a":COLS.textDim }}>{i+1}º</span>
@@ -769,20 +881,25 @@ export default function App() {
  
             {tab === "resultados" && (
               <div className="fade">
-                <p style={S.note}>Resultados oficiais (via TheSportsDB)</p>
-                {jogos.map(jg => {
-                  const res = resultadoFinal(jg.id); const tem = res && res.casa != null && res.fora != null;
-                  return (
-                    <div key={jg.id} style={S.match}>
-                      <div style={S.mTop}><span style={S.grp}>Grupo {jg.grupo}</span><span style={S.dt}>{fmtData(jg.iso)}</span></div>
-                      <div style={S.mRow}>
-                        <span style={S.team}>{jg.casa}</span>
-                        <span style={S.scShow}>{tem ? res.casa : "–"}</span><span style={S.x}>×</span><span style={S.scShow}>{tem ? res.fora : "–"}</span>
-                        <span style={{ ...S.team, textAlign: "right" }}>{jg.fora}</span>
-                      </div>
-                    </div>
-                  );
-                })}
+                <p style={S.note}>Resultados oficiais (automático via TheSportsDB + correções do admin)</p>
+                {porGrupo.map(({ grupo, jogos: js }) => (
+                  <div key={grupo}>
+                    <div style={S.groupHead}>GRUPO {grupo}</div>
+                    {js.map(jg => {
+                      const res = resultadoFinal(jg.id, jg.casa, jg.fora); const tem = res && res.casa != null && res.fora != null;
+                      return (
+                        <div key={jg.id} style={S.match}>
+                          <div style={S.mTop}><span style={S.dt}>{fmtData(jg.iso)}</span></div>
+                          <div style={S.mRow}>
+                            <span style={S.team}>{jg.casa}</span>
+                            <span style={S.scShow}>{tem ? res.casa : "–"}</span><span style={S.x}>×</span><span style={S.scShow}>{tem ? res.fora : "–"}</span>
+                            <span style={{ ...S.team, textAlign: "right" }}>{jg.fora}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             )}
  
@@ -798,24 +915,28 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    <p style={S.note}>Correção manual de placar (só se a API atrasar — o valor manual tem prioridade).</p>
-                    {jogos.map(jg => {
-                      const m = resultadosManuais[jg.id] || { casa: null, fora: null };
-                      const a = apiResultados[jg.id];
-                      return (
-                        <div key={jg.id} style={S.match}>
-                          <div style={S.mTop}><span style={S.grp}>Grupo {jg.grupo}</span><span style={S.dt}>{a ? `API: ${a.casa}×${a.fora}` : "API: —"}</span></div>
-                          <div style={S.mRow}>
-                            <span style={S.team}>{jg.casa}</span>
-                            <input type="number" min="0" style={S.sc} value={m.casa ?? ""} placeholder="–" onChange={e => salvarResultadoManual(jg.id, "casa", e.target.value)} />
-                            <span style={S.x}>×</span>
-                            <input type="number" min="0" style={S.sc} value={m.fora ?? ""} placeholder="–" onChange={e => salvarResultadoManual(jg.id, "fora", e.target.value)} />
-                            <span style={{ ...S.team, textAlign: "right" }}>{jg.fora}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <p style={S.hint}>Campos vazios = usa o resultado automático da API.</p>
+                    <p style={S.note}>Correção manual de placar (tem prioridade sobre a API). Campos vazios = usa o automático.</p>
+                    {porGrupo.map(({ grupo, jogos: js }) => (
+                      <div key={grupo}>
+                        <div style={S.groupHead}>GRUPO {grupo}</div>
+                        {js.map(jg => {
+                          const m = resultadosManuais[jg.id] || { casa: null, fora: null };
+                          const a = apiResultados[chaveJogo(jg.casa, jg.fora)];
+                          return (
+                            <div key={jg.id} style={S.match}>
+                              <div style={S.mTop}><span style={S.dt}>{jg.casa} × {jg.fora}</span><span style={S.dt}>{a ? `API: ${a.casa}×${a.fora}` : "API: —"}</span></div>
+                              <div style={S.mRow}>
+                                <span style={S.team}>{jg.casa}</span>
+                                <input type="number" min="0" style={S.sc} value={m.casa ?? ""} placeholder="–" onChange={e => salvarResultadoManual(jg.id, "casa", e.target.value)} />
+                                <span style={S.x}>×</span>
+                                <input type="number" min="0" style={S.sc} value={m.fora ?? ""} placeholder="–" onChange={e => salvarResultadoManual(jg.id, "fora", e.target.value)} />
+                                <span style={{ ...S.team, textAlign: "right" }}>{jg.fora}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </>
                 )}
               </div>
@@ -857,10 +978,11 @@ const S = {
   syncBtn: { background: "transparent", border: `1px solid ${COLS.line}`, color: COLS.gold, borderRadius: 8, padding: "4px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" },
   note: { color: COLS.textDim, fontSize: 13, margin: "4px 4px 14px", lineHeight: 1.4 },
   empty: { color: COLS.textDim, textAlign: "center", padding: 30 },
+  groupHead: { color: COLS.gold, fontFamily: "Anton, sans-serif", fontSize: 16, letterSpacing: 2, margin: "16px 4px 8px", paddingBottom: 4, borderBottom: `1px solid ${COLS.line}` },
   match: { background: COLS.card, border: `1px solid ${COLS.line}`, borderRadius: 14, padding: 14, marginBottom: 10 },
-  mTop: { display: "flex", justifyContent: "space-between", marginBottom: 10 },
-  grp: { color: COLS.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 },
-  dt: { color: COLS.textDim, fontSize: 11 },
+  mTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  dt: { color: COLS.textDim, fontSize: 11, textTransform: "capitalize" },
+  lock: { color: COLS.red, fontSize: 10, fontWeight: 800, border: `1px solid ${COLS.red}`, borderRadius: 6, padding: "1px 6px" },
   mRow: { display: "flex", alignItems: "center", gap: 8 },
   team: { flex: 1, fontSize: 14, fontWeight: 600 },
   sc: { width: 46, height: 46, textAlign: "center", background: COLS.cardAlt, border: `1px solid ${COLS.line}`, borderRadius: 10, color: COLS.white, fontSize: 20, fontWeight: 800, outline: "none" },
