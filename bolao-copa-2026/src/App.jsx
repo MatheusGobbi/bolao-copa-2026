@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase, ADMIN_PASSWORD, TRAVA_MINUTOS, LEAGUE_ID, API_KEY, PONTOS } from "./config";
 import { JOGOS_OFICIAIS, bandeira } from "./jogos";
+import Paroquia from "./Paroquia";
 
 // Paleta clara — verde só como destaque
 const C = {
@@ -54,6 +55,7 @@ function jogoFechado(jogo, resultado) {
 
 export default function App() {
   const [tab, setTab] = useState("palpites");
+  const [modo, setModo] = useState("copa"); // "copa" ou "paroquia"
   const [rodada, setRodada] = useState(1);
   const [jogos, setJogos] = useState(JOGOS_OFICIAIS);
   const [resultadosManuais, setResultadosManuais] = useState({});
@@ -291,6 +293,15 @@ export default function App() {
             <button style={S.ghost} onClick={sair}>sair</button>
           </div>
 
+          <div style={S.modoBar}>
+            <button onClick={() => { setModo("copa"); setTab("palpites"); }} style={{ ...S.modoBtn, ...(modo === "copa" ? S.modoOn : {}) }}>🏆 Bolão da Copa</button>
+            <button onClick={() => { setModo("paroquia"); setTab("palpites"); }} style={{ ...S.modoBtn, ...(modo === "paroquia" ? S.modoOn : {}) }}>⛪ Bolão Solidário</button>
+          </div>
+
+          {modo === "paroquia" ? (
+            <Paroquia nome={nome} isAdmin={isAdmin} />
+          ) : (
+          <>
           <nav style={S.tabs}>
             {[["palpites","Palpites"],["ranking","Ranking"],["resultados","Resultados"], ...(adminAberto ? [["admin","Admin"]] : [])].map(([k,l]) => (
               <button key={k} onClick={() => setTab(k)} style={{ ...S.tab, ...(tab === k ? S.tabOn : {}) }}>{l}</button>
@@ -375,6 +386,8 @@ export default function App() {
               </div>
             )}
           </main>
+          </>
+          )}
         </>
       )}
 
@@ -403,6 +416,9 @@ const S = {
   btn2: { width: "100%", background: C.white, color: C.green, border: `1.5px solid ${C.green}`, borderRadius: 12, padding: 12.5, fontWeight: 800, fontSize: 14, cursor: "pointer" },
   hint: { color: C.inkSoft, fontSize: 12, marginTop: 10, lineHeight: 1.45 },
   userbar: { display: "flex", alignItems: "center", padding: "4px 18px 8px", fontSize: 14 },
+  modoBar: { display: "flex", gap: 8, padding: "0 14px 10px" },
+  modoBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 12, padding: "11px 6px", fontSize: 13, fontWeight: 800, cursor: "pointer" },
+  modoOn: { background: C.ink, color: C.white, borderColor: C.ink },
   ghost: { marginLeft: "auto", background: "transparent", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 8, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 },
   tabs: { display: "flex", gap: 6, padding: "2px 14px 8px" },
   tab: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 11, padding: "10px 4px", fontSize: 13, fontWeight: 700, cursor: "pointer" },
