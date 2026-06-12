@@ -19,5 +19,7 @@ export const ADMIN_PASSWORD = "copa2026"; // senha do painel admin
 export const TRAVA_MINUTOS = 10;          // palpite fecha N min antes do jogo
 export const LEAGUE_ID = 4429;            // FIFA World Cup na TheSportsDB
 export const API_KEY = "123";             // chave pública gratuita
-export const PONTOS = { exato: 5, parcial: 3, resultado: 3, erro: 0 };
-// Regras: 5 pts placar exato · 3 pts acertar vitória/empate (resultado)
+export const PONTOS = { exato: 5, vencedor: 3, diferenca: 2, perdedor: 1 };
+// Faixas SOMÁVEIS: placar exato +5 · acertar vencedor/empate +3 ·
+// acertar a diferença de gols +2 · acertar os gols do perdedor +1.
+// Diferença e perdedor só contam se acertou o vencedor. Cravar o placar = 11 pts.
