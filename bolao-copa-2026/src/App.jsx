@@ -64,6 +64,8 @@ export default function App() {
   const [logado, setLogado] = useState(false);
   const [authMsg, setAuthMsg] = useState("");
   const [carregandoAuth, setCarregandoAuth] = useState(false);
+  const [acaoAuth, setAcaoAuth] = useState(null); // "entrar" | "criar" | null
+  const [salvando, setSalvando] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminAberto, setAdminAberto] = useState(false); // tela admin visível?
@@ -133,7 +135,16 @@ export default function App() {
   }, [carregarBanco, sincronizar]);
 
   useEffect(() => { const t = setInterval(() => force(n => n + 1), 30000); return () => clearInterval(t); }, []);
-  useEffect(() => { if (!logado) return; const t = setInterval(carregarBanco, 25000); return () => clearInterval(t); }, [logado, carregarBanco]);
+  useEffect(() => {
+    if (!logado) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") carregarBanco();
+    }, 60000);
+    // recarrega ao voltar para a aba
+    const onVis = () => { if (document.visibilityState === "visible") carregarBanco(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
+  }, [logado, carregarBanco]);
 
   // 5 toques no título abrem o admin
   function tocarTitulo() {
@@ -147,28 +158,22 @@ export default function App() {
 
   async function criarConta() {
     const n = nome.trim(); if (!n || !senha) { setAuthMsg("Preencha nome e senha."); return; }
-    const dono = localStorage.getItem("bolao:dono");
-    if (dono) { setAuthMsg(`Este dispositivo já tem a conta "${dono}". Entre com ela.`); return; }
-    setCarregandoAuth(true); setAuthMsg("");
+    setCarregandoAuth(true); setAcaoAuth("criar"); setAuthMsg("");
     const { data: existe } = await supabase.from("usuarios").select("nome").eq("nome", n).maybeSingle();
-    if (existe) { setAuthMsg("Esse nome já existe. Tente entrar."); setCarregandoAuth(false); return; }
+    if (existe) { setAuthMsg("Esse nome já existe. Tente entrar ou escolha outro nome."); setCarregandoAuth(false); setAcaoAuth(null); return; }
     const { error } = await supabase.from("usuarios").insert({ nome: n, senha });
-    setCarregandoAuth(false);
+    setCarregandoAuth(false); setAcaoAuth(null);
     if (error) { setAuthMsg("Erro ao criar conta."); return; }
-    localStorage.setItem("bolao:dono", n);
     localStorage.setItem("bolao:auth", JSON.stringify({ nome: n }));
     setLogado(true); carregarBanco();
   }
   async function entrar() {
     const n = nome.trim(); if (!n || !senha) { setAuthMsg("Preencha nome e senha."); return; }
-    const dono = localStorage.getItem("bolao:dono");
-    if (dono && dono !== n) { setAuthMsg(`Este dispositivo está vinculado à conta "${dono}".`); return; }
-    setCarregandoAuth(true); setAuthMsg("");
+    setCarregandoAuth(true); setAcaoAuth("entrar"); setAuthMsg("");
     const { data: u } = await supabase.from("usuarios").select("*").eq("nome", n).maybeSingle();
-    setCarregandoAuth(false);
+    setCarregandoAuth(false); setAcaoAuth(null);
     if (!u) { setAuthMsg("Conta não encontrada. Crie uma conta."); return; }
     if (u.senha !== senha) { setAuthMsg("Senha incorreta."); return; }
-    localStorage.setItem("bolao:dono", n);
     localStorage.setItem("bolao:auth", JSON.stringify({ nome: n }));
     setLogado(true); carregarBanco();
   }
@@ -180,7 +185,9 @@ export default function App() {
     const atual = palpitesTodos[nome]?.[jogoId] || { casa: null, fora: null };
     const novo = { ...atual, [campo]: v };
     setPalpitesTodos(p => ({ ...p, [nome]: { ...(p[nome] || {}), [jogoId]: novo } }));
+    setSalvando(true);
     await supabase.from("palpites").upsert({ nome, jogo_id: jogoId, casa: novo.casa, fora: novo.fora, atualizado_em: new Date().toISOString() }, { onConflict: "nome,jogo_id" });
+    setSalvando(false);
   }
   async function salvarResultadoManual(jogoId, campo, valor) {
     const v = valor === "" ? null : +valor;
@@ -268,6 +275,10 @@ export default function App() {
         input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
         input[type=number]{-moz-appearance:textfield}
         body{margin:0;background:${C.bg}}
+        button{transition:opacity .15s, transform .06s, background .15s, border-color .15s}
+        button:active:not(:disabled){transform:scale(0.97)}
+        button:disabled{cursor:not-allowed}
+        input:focus{border-color:${C.green}!important;background:${C.white}!important}
         .fade{animation:fade .35s ease}@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
       `}</style>
 
@@ -278,15 +289,25 @@ export default function App() {
       </header>
 
       {!logado ? (
-        <div style={{ ...S.card, ...S.wrap }} className="fade">
-          <div style={S.label}>Nome</div>
-          <input style={S.in} value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: João da TI" />
-          <div style={S.label}>Senha</div>
-          <input type="password" style={S.in} value={senha} onChange={e => setSenha(e.target.value)} placeholder="sua senha do bolão" />
-          <button style={S.btn} disabled={carregandoAuth} onClick={entrar}>Entrar</button>
-          <button style={S.btn2} disabled={carregandoAuth} onClick={criarConta}>Criar conta</button>
-          {authMsg && <p style={{ ...S.hint, color: C.red }}>{authMsg}</p>}
-          <p style={S.hint}>Não use uma senha importante — aqui ela serve só para o bolão.</p>
+        <div style={S.loginWrap} className="fade">
+          <div style={S.loginCard}>
+            <div style={S.loginTitle}>Entrar no bolão</div>
+            <div style={S.loginIntro}>Use o mesmo nome e senha sempre para manter seus palpites.</div>
+            <div style={S.label}>Nome</div>
+            <input style={S.in} value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: João da TI"
+              onKeyDown={e => e.key === "Enter" && entrar()} />
+            <div style={S.label}>Senha</div>
+            <input type="password" style={S.in} value={senha} onChange={e => setSenha(e.target.value)} placeholder="sua senha do bolão"
+              onKeyDown={e => e.key === "Enter" && entrar()} />
+            <button style={{ ...S.btn, ...(carregandoAuth ? S.btnLoading : {}) }} disabled={carregandoAuth} onClick={entrar}>
+              {acaoAuth === "entrar" ? "Entrando…" : "Entrar"}
+            </button>
+            <button style={{ ...S.btn2, ...(carregandoAuth ? S.btnLoading : {}) }} disabled={carregandoAuth} onClick={criarConta}>
+              {acaoAuth === "criar" ? "Criando conta…" : "Criar conta"}
+            </button>
+            {authMsg && <p style={{ ...S.hint, color: C.red, marginTop: 12 }}>{authMsg}</p>}
+            <p style={S.hint}>Não use uma senha importante — aqui ela serve só para o bolão.</p>
+          </div>
         </div>
       ) : (
         <>
@@ -320,7 +341,7 @@ export default function App() {
           <main style={S.wrap}>
             {tab === "palpites" && (
               <div className="fade">
-                <p style={S.note}>Palpites fecham {TRAVA_MINUTOS} min antes de cada jogo. Salva sozinho.</p>
+                <p style={S.note}>Palpites fecham {TRAVA_MINUTOS} min antes de cada jogo. {salvando ? <span style={{ color: C.green, fontWeight: 700 }}>salvando…</span> : <span>Salva sozinho.</span>}</p>
                 {porGrupo.map(({ grupo, jogos: js }) => (
                   <div key={grupo}>
                     <div style={S.groupHead}>Grupo {grupo}</div>
@@ -402,10 +423,15 @@ const S = {
   title: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 44, margin: "2px 0", color: C.ink, fontWeight: 800, letterSpacing: -1, cursor: "default", userSelect: "none" },
   sub: { color: C.inkSoft, letterSpacing: 1, fontSize: 12, fontWeight: 600 },
   wrap: { padding: "0 14px" },
+  loginWrap: { padding: "12px 22px 0" },
+  loginCard: { background: C.surface, border: `1px solid ${C.line}`, borderRadius: 20, padding: "26px 22px", boxShadow: "0 6px 28px rgba(20,40,25,0.07)" },
+  loginTitle: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 22, fontWeight: 800, color: C.ink, marginBottom: 4 },
+  loginIntro: { color: C.inkSoft, fontSize: 13, lineHeight: 1.45, marginBottom: 20 },
   card: { background: C.surface, border: `1px solid ${C.line}`, borderRadius: 18, padding: 22, margin: "0 14px", boxShadow: "0 4px 20px rgba(20,40,25,0.05)" },
   label: { color: C.inkSoft, fontSize: 12.5, marginBottom: 7, fontWeight: 700 },
-  in: { width: "100%", background: C.soft, border: `1px solid ${C.line}`, borderRadius: 12, padding: "13px 14px", color: C.ink, fontSize: 16, outline: "none", marginBottom: 12 },
-  btn: { width: "100%", background: C.green, color: C.white, border: "none", borderRadius: 12, padding: 14, fontWeight: 800, fontSize: 15, cursor: "pointer", marginBottom: 8 },
+  in: { width: "100%", background: C.soft, border: `1px solid ${C.line}`, borderRadius: 12, padding: "14px 15px", color: C.ink, fontSize: 16, outline: "none", marginBottom: 14, transition: "border-color .15s, background .15s" },
+  btn: { width: "100%", background: C.green, color: C.white, border: "none", borderRadius: 12, padding: 15, fontWeight: 800, fontSize: 15, cursor: "pointer", marginBottom: 9, transition: "opacity .15s, transform .05s" },
+  btnLoading: { opacity: .65, cursor: "wait" },
   btn2: { width: "100%", background: C.white, color: C.green, border: `1.5px solid ${C.green}`, borderRadius: 12, padding: 12.5, fontWeight: 800, fontSize: 14, cursor: "pointer" },
   hint: { color: C.inkSoft, fontSize: 12, marginTop: 10, lineHeight: 1.45 },
   userbar: { display: "flex", alignItems: "center", padding: "4px 18px 8px", fontSize: 14 },
