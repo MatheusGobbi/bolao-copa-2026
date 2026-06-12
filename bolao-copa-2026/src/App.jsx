@@ -82,9 +82,11 @@ export default function App() {
 
   const carregarBanco = useCallback(async () => {
     const { data: jg } = await supabase.from("jogos").select("*").order("ordem", { ascending: true });
+    // mapa de jogos sem pontuação, vindo do arquivo local (não depende do banco)
+    const semPontosSet = new Set(JOGOS_OFICIAIS.filter(j => j.semPontos).map(j => j.id));
     if (jg && jg.length) {
-      // mantém rodada se existir no banco; senão deduz pela data
-      setJogos(jg.map(j => ({ id: j.id, grupo: j.grupo, casa: j.casa, fora: j.fora, iso: j.iso, rodada: j.rodada })));
+      // mantém rodada se existir no banco; semPontos vem do arquivo local
+      setJogos(jg.map(j => ({ id: j.id, grupo: j.grupo, casa: j.casa, fora: j.fora, iso: j.iso, rodada: j.rodada, semPontos: semPontosSet.has(j.id) })));
     } else {
       const semente = JOGOS_OFICIAIS.map((j, i) => ({ id: j.id, grupo: j.grupo, casa: j.casa, fora: j.fora, iso: j.iso, rodada: j.rodada, ordem: i }));
       await supabase.from("jogos").upsert(semente, { onConflict: "id" });
@@ -203,6 +205,7 @@ export default function App() {
       let total = 0, exatos = 0, jogados = 0;
       const pal = palpitesTodos[jogador] || {};
       for (const jg of jogos) {
+        if (jg.semPontos) continue; // jogos de abertura não contam
         const p = calcPontos(pal[jg.id], resultadoFinal(jg.id, jg.casa, jg.fora));
         if (p != null) { total += p; jogados++; if (p === PONTOS.exato) exatos++; }
       }
@@ -234,12 +237,23 @@ export default function App() {
     const pts = calcPontos(p, res);
     const m = resultadosManuais[jg.id] || { casa: null, fora: null };
     const a = apiResultados[chaveJogo(jg.casa, jg.fora)];
+    const meuPreenchido = p.casa != null && p.fora != null;
+    // palpites dos outros (só quando o jogo fechou) — usa dados já em memória
+    const palpitesDoJogo = (modo === "palpite" && fechado)
+      ? usuarios
+          .map(u => ({ u, pal: palpitesTodos[u]?.[jg.id] }))
+          .filter(o => o.pal && o.pal.casa != null && o.pal.fora != null)
+      : [];
     return (
       <div style={S.match}>
         <div style={S.mTop}>
           <span style={S.dt}>{fmtData(jg.iso)}</span>
-          {modo === "palpite" && fechado && !tem && <span style={S.lock}>fechado</span>}
-          {modo === "admin" && <span style={S.dt}>{a ? `API ${a.casa}×${a.fora}` : "API —"}</span>}
+          <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {jg.semPontos && <span style={S.noPts}>não vale pontos</span>}
+            {modo === "palpite" && !fechado && meuPreenchido && <span style={S.savedTag}>✓ salvo</span>}
+            {modo === "palpite" && fechado && !tem && <span style={S.lock}>fechado</span>}
+            {modo === "admin" && <span style={S.dt}>{a ? `API ${a.casa}×${a.fora}` : "API —"}</span>}
+          </span>
         </div>
         <div style={S.mRow}>
           <span style={S.team}><span style={S.flag}>{bandeira(jg.casa)}</span>{jg.casa}</span>
@@ -261,6 +275,23 @@ export default function App() {
         {modo === "palpite" && tem && (
           <div style={S.resLine}>Final {res.casa} × {res.fora}
             <span style={{ ...S.badge, background: pts === PONTOS.exato ? C.green : pts > 0 ? C.gold : C.red }}>{pts != null ? `+${pts} pts` : "sem palpite"}</span>
+          </div>
+        )}
+        {palpitesDoJogo.length > 0 && (
+          <div style={S.othersBox}>
+            <div style={S.othersTitle}>Palpites de todos</div>
+            <div style={S.othersList}>
+              {palpitesDoJogo.map(({ u, pal }) => {
+                const ap = tem ? calcPontos(pal, res) : null;
+                return (
+                  <div key={u} style={{ ...S.otherRow, ...(u === nome ? S.otherMe : {}) }}>
+                    <span style={S.otherName}>{u}</span>
+                    <span style={S.otherScore}>{pal.casa} × {pal.fora}</span>
+                    {tem && ap != null && <span style={{ ...S.otherPts, color: ap === PONTOS.exato ? C.green : ap > 0 ? C.gold : C.inkSoft }}>{jg.semPontos ? "—" : `+${ap}`}</span>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -451,6 +482,16 @@ const S = {
   mTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 },
   dt: { color: C.inkSoft, fontSize: 10.5, textTransform: "capitalize", fontWeight: 600 },
   lock: { color: C.red, fontSize: 9.5, fontWeight: 800, background: "#fbeae6", borderRadius: 6, padding: "2px 7px" },
+  noPts: { color: C.inkSoft, fontSize: 9.5, fontWeight: 800, background: C.soft, borderRadius: 6, padding: "2px 7px" },
+  savedTag: { color: C.green, fontSize: 9.5, fontWeight: 800, background: C.greenSoft, borderRadius: 6, padding: "2px 7px" },
+  othersBox: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` },
+  othersTitle: { color: C.inkSoft, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 },
+  othersList: { display: "flex", flexDirection: "column", gap: 4 },
+  otherRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 6px", borderRadius: 7 },
+  otherMe: { background: C.greenSoft },
+  otherName: { flex: 1, color: C.ink, fontWeight: 600 },
+  otherScore: { color: C.ink, fontWeight: 800, fontFamily: "'Bricolage Grotesque', sans-serif" },
+  otherPts: { width: 32, textAlign: "right", fontWeight: 800, fontSize: 12 },
   mRow: { display: "flex", alignItems: "center", gap: 8 },
   team: { flex: 1, fontSize: 13.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, minWidth: 0 },
   flag: { fontSize: 18, lineHeight: 1 },
