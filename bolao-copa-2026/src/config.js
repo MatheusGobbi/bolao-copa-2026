@@ -1,14 +1,16 @@
 // ============================================================
-//  CONFIGURAÇÃO — preencha com os dados do seu projeto Supabase
+//  CONFIGURAÇÃO — dados do seu projeto Supabase
 //  (Supabase > Project Settings > API)
 // ============================================================
 import { createClient } from "@supabase/supabase-js";
 
-// 1) Cole aqui a "Project URL"
-const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+// 1) Project URL (já preenchida com a sua)
+const SUPABASE_URL = "https://cfzgvstgqbuuvyxxmvqe.supabase.co";
 
-// 2) Cole aqui a chave "anon public"
-const SUPABASE_ANON_KEY = "SUA_CHAVE_ANON_PUBLIC";
+// 2) >>> COLE AQUI a chave "anon public" <<<
+//    Supabase > Project Settings > API > Project API keys > "anon public"
+//    Apague o texto COLE_SUA_CHAVE_ANON_AQUI e ponha a chave longa entre as aspas.
+const SUPABASE_ANON_KEY = "COLE_SUA_CHAVE_ANON_AQUI";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
