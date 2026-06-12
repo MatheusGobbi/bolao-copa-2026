@@ -33,12 +33,8 @@ function calcPontos(palpite, resultado) {
   if (!palpite || palpite.casa == null || palpite.casa === "" || palpite.fora == null || palpite.fora === "") return null;
   const pc = +palpite.casa, pf = +palpite.fora, rc = +resultado.casa, rf = +resultado.fora;
   const empateReal = rc === rf;
-  // placar exato
-  if (pc === rc && pf === rf) {
-    return empateReal
-      ? PONTOS.exato + PONTOS.vencedor                                  // empate cravado
-      : PONTOS.exato + PONTOS.vencedor + PONTOS.diferenca + PONTOS.perdedor; // vitória cravada
-  }
+  // placar exato = sempre a pontuação máxima (vitória ou empate)
+  if (pc === rc && pf === rf) return PONTOS.exato + PONTOS.vencedor + PONTOS.diferenca + PONTOS.perdedor;
   const s = (a, b) => (a > b ? 1 : a < b ? -1 : 0);
   // errou o vencedor (ou empate vs vitória) → 0
   if (s(pc, pf) !== s(rc, rf)) return 0;
@@ -75,6 +71,7 @@ function jogoFechado(jogo, resultado) {
 export default function App() {
   const [tab, setTab] = useState("palpites");
   const [rodada, setRodada] = useState(1);
+  const [visao, setVisao] = useState("grupo"); // "grupo" ou "dia"
   const [jogos, setJogos] = useState(JOGOS_OFICIAIS);
   const [resultadosManuais, setResultadosManuais] = useState({});
   const [apiResultados, setApiResultados] = useState({});
@@ -89,6 +86,7 @@ export default function App() {
   const [acaoAuth, setAcaoAuth] = useState(null); // "entrar" | "criar" | null
   const [salvando, setSalvando] = useState(false);
   const [regrasAbertas, setRegrasAbertas] = useState(false);
+  const [palpitesAbertos, setPalpitesAbertos] = useState({}); // { jogoId: true }
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminAberto, setAdminAberto] = useState(false); // tela admin visível?
@@ -133,20 +131,37 @@ export default function App() {
 
   const sincronizar = useCallback(async () => {
     setSyncStatus("sincronizando");
+    const url = `${API_BASE}/eventspastleague.php?id=${LEAGUE_ID}`;
+    console.log("[BOLÃO] Sincronizando resultados…", url);
     try {
-      const passados = await fetch(`${API_BASE}/eventspastleague.php?id=${LEAGUE_ID}`).then(r => r.json()).catch(() => null);
+      const resp = await fetch(url);
+      console.log("[BOLÃO] Status HTTP:", resp.status);
+      const passados = await resp.json().catch((e) => { console.error("[BOLÃO] Erro ao ler JSON:", e); return null; });
+      console.log("[BOLÃO] Resposta da API:", passados);
+      const eventos = passados?.events;
+      console.log("[BOLÃO] Eventos retornados:", Array.isArray(eventos) ? eventos.length : "nenhum (events =", eventos, ")");
       const ar = {};
-      if (passados?.events) {
-        for (const ev of passados.events) {
+      let comPlacar = 0, de2026 = 0;
+      if (Array.isArray(eventos)) {
+        for (const ev of eventos) {
           if (ev.intHomeScore == null || ev.intHomeScore === "" || ev.intAwayScore == null || ev.intAwayScore === "") continue;
+          comPlacar++;
           const dt = ev.dateEvent ? new Date(`${ev.dateEvent}T00:00:00Z`).getTime() : NaN;
           if (isNaN(dt) || dt < new Date("2026-01-01T00:00:00Z").getTime()) continue;
-          ar[chaveJogo(ev.strHomeTeam, ev.strAwayTeam)] = { casa: +ev.intHomeScore, fora: +ev.intAwayScore };
+          de2026++;
+          const chave = chaveJogo(ev.strHomeTeam, ev.strAwayTeam);
+          console.log(`[BOLÃO] Jogo da API: ${ev.strHomeTeam} ${ev.intHomeScore}x${ev.intAwayScore} ${ev.strAwayTeam} (${ev.dateEvent}) → chave: ${chave}`);
+          ar[chave] = { casa: +ev.intHomeScore, fora: +ev.intAwayScore };
         }
       }
+      console.log(`[BOLÃO] Resumo: ${comPlacar} com placar, ${de2026} de 2026+, ${Object.keys(ar).length} resultados prontos.`);
+      console.log("[BOLÃO] Chaves dos SEUS jogos:", JOGOS_OFICIAIS.map(j => chaveJogo(j.casa, j.fora)));
       setApiResultados(ar);
       setSyncStatus(Object.keys(ar).length ? "ok" : "sem-resultados");
-    } catch { setSyncStatus("erro"); }
+    } catch (e) {
+      console.error("[BOLÃO] Falha na sincronização:", e);
+      setSyncStatus("erro");
+    }
   }, []);
 
   useEffect(() => {
@@ -160,6 +175,16 @@ export default function App() {
   }, [carregarBanco, sincronizar]);
 
   useEffect(() => { const t = setInterval(() => force(n => n + 1), 30000); return () => clearInterval(t); }, []);
+
+  // ao mudar para visão "por dia", rola até o dia de hoje (ou próximo com jogos)
+  useEffect(() => {
+    if (visao !== "dia") return;
+    const t = setTimeout(() => {
+      const alvo = document.querySelector('[data-hoje="1"]') || document.querySelector('[data-proximo="1"]');
+      if (alvo) alvo.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(t);
+  }, [visao, tab]);
   useEffect(() => {
     if (!logado) return;
     const t = setInterval(() => {
@@ -245,6 +270,28 @@ export default function App() {
     return Object.keys(g).sort().map(k => ({ grupo: k, jogos: g[k] }));
   }, [jogos, rodada]);
 
+  // todos os jogos agrupados por DIA, ordenados por data/horário
+  const porDia = useMemo(() => {
+    const ordenados = [...jogos].sort((a, b) => (a.iso || "").localeCompare(b.iso || ""));
+    const dias = {};
+    for (const jg of ordenados) {
+      const d = jg.iso ? new Date(jg.iso) : null;
+      const chave = d && !isNaN(d) ? d.toISOString().slice(0, 10) : "sem-data";
+      (dias[chave] = dias[chave] || []).push(jg);
+    }
+    return Object.keys(dias).sort().map(k => ({ dia: k, jogos: dias[k] }));
+  }, [jogos]);
+
+  // rótulo amigável do dia (ex: "Sábado, 13/06")
+  const labelDia = (chave) => {
+    if (chave === "sem-data") return "Data a definir";
+    const d = new Date(`${chave}T12:00:00Z`);
+    if (isNaN(d)) return chave;
+    const txt = d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
+    return txt.charAt(0).toUpperCase() + txt.slice(1);
+  };
+  const hojeChave = new Date().toISOString().slice(0, 10);
+
   if (loading) return (
     <div style={{ ...S.app, display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
       <div style={{ color: C.green, fontWeight: 800 }}>Carregando o bolão…</div>
@@ -302,25 +349,53 @@ export default function App() {
           </div>
         )}
         {palpitesDoJogo.length > 0 && (
-          <div style={S.othersBox}>
-            <div style={S.othersTitle}>Palpites de todos</div>
-            <div style={S.othersList}>
-              {palpitesDoJogo.map(({ u, pal }) => {
-                const ap = tem ? calcPontos(pal, res) : null;
-                return (
-                  <div key={u} style={{ ...S.otherRow, ...(u === nome ? S.otherMe : {}) }}>
-                    <span style={S.otherName}>{u}</span>
-                    <span style={S.otherScore}>{pal.casa} × {pal.fora}</span>
-                    {tem && ap != null && <span style={{ ...S.otherPts, color: ehExato(pal, res) ? C.green : ap > 0 ? C.gold : C.inkSoft }}>{jg.semPontos ? "—" : `+${ap}`}</span>}
-                  </div>
-                );
-              })}
-            </div>
+          <div style={S.othersWrap}>
+            <button style={S.othersToggle} onClick={() => setPalpitesAbertos(s => ({ ...s, [jg.id]: !s[jg.id] }))}>
+              {palpitesAbertos[jg.id] ? "▲ ocultar palpites" : `▼ ver palpites dos participantes (${palpitesDoJogo.length})`}
+            </button>
+            {palpitesAbertos[jg.id] && (
+              <div style={S.othersList}>
+                {palpitesDoJogo.map(({ u, pal }) => {
+                  const ap = tem ? calcPontos(pal, res) : null;
+                  return (
+                    <div key={u} style={{ ...S.otherRow, ...(u === nome ? S.otherMe : {}) }}>
+                      <span style={S.otherName}>{u}</span>
+                      <span style={S.otherScore}>{pal.casa} × {pal.fora}</span>
+                      {tem && ap != null && <span style={{ ...S.otherPts, color: ehExato(pal, res) ? C.green : ap > 0 ? C.gold : C.inkSoft }}>{jg.semPontos ? "—" : `+${ap}`}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
     );
   };
+
+  // primeiro dia (>= hoje) com jogos, para marcar o alvo do auto-scroll
+  const proximoDiaComJogos = porDia.find(d => d.dia >= hojeChave)?.dia || (porDia[porDia.length - 1]?.dia);
+
+  // renderiza os jogos conforme a visão escolhida (grupo ou dia)
+  const renderConteudo = (modo) => {
+    if (visao === "dia") {
+      return porDia.map(({ dia, jogos: js }) => (
+        <div key={dia} data-hoje={dia === hojeChave ? "1" : undefined} data-proximo={dia === proximoDiaComJogos ? "1" : undefined}>
+          <div style={{ ...S.groupHead, ...(dia === hojeChave ? S.dayHoje : {}) }}>
+            {labelDia(dia)}{dia === hojeChave ? " · hoje" : ""}
+          </div>
+          {js.map(jg => <div key={jg.id}><div style={S.grpTag}>Grupo {jg.grupo}{jg.rodada ? ` · ${jg.rodada}ª rodada` : ""}</div><Jogo jg={jg} modo={modo} /></div>)}
+        </div>
+      ));
+    }
+    return porGrupo.map(({ grupo, jogos: js }) => (
+      <div key={grupo}>
+        <div style={S.groupHead}>Grupo {grupo}</div>
+        {js.map(jg => <Jogo key={jg.id} jg={jg} modo={modo} />)}
+      </div>
+    ));
+  };
+
 
   return (
     <div style={S.app}>
@@ -386,23 +461,26 @@ export default function App() {
           </div>
 
           {(tab === "palpites" || tab === "resultados" || tab === "admin") && (
-            <div style={S.rodadaBar}>
-              {[1,2,3].map(r => (
-                <button key={r} onClick={() => setRodada(r)} style={{ ...S.rodadaBtn, ...(rodada === r ? S.rodadaOn : {}) }}>{r}ª rodada</button>
-              ))}
-            </div>
+            <>
+              <div style={S.visaoBar}>
+                <button onClick={() => setVisao("grupo")} style={{ ...S.visaoBtn, ...(visao === "grupo" ? S.visaoOn : {}) }}>Por grupo</button>
+                <button onClick={() => setVisao("dia")} style={{ ...S.visaoBtn, ...(visao === "dia" ? S.visaoOn : {}) }}>Por dia</button>
+              </div>
+              {visao === "grupo" && (
+                <div style={S.rodadaBar}>
+                  {[1,2,3].map(r => (
+                    <button key={r} onClick={() => setRodada(r)} style={{ ...S.rodadaBtn, ...(rodada === r ? S.rodadaOn : {}) }}>{r}ª rodada</button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           <main style={S.wrap}>
             {tab === "palpites" && (
               <div className="fade">
                 <p style={S.note}>Palpites fecham {TRAVA_MINUTOS} min antes de cada jogo. {salvando ? <span style={{ color: C.green, fontWeight: 700 }}>salvando…</span> : <span>Salva sozinho.</span>}</p>
-                {porGrupo.map(({ grupo, jogos: js }) => (
-                  <div key={grupo}>
-                    <div style={S.groupHead}>Grupo {grupo}</div>
-                    {js.map(jg => <Jogo key={jg.id} jg={jg} modo="palpite" />)}
-                  </div>
-                ))}
+                {renderConteudo("palpite")}
               </div>
             )}
 
@@ -424,12 +502,7 @@ export default function App() {
             {tab === "resultados" && (
               <div className="fade">
                 <p style={S.note}>Resultados oficiais (automático + correções)</p>
-                {porGrupo.map(({ grupo, jogos: js }) => (
-                  <div key={grupo}>
-                    <div style={S.groupHead}>Grupo {grupo}</div>
-                    {js.map(jg => <Jogo key={jg.id} jg={jg} modo="resultado" />)}
-                  </div>
-                ))}
+                {renderConteudo("resultado")}
               </div>
             )}
 
@@ -447,12 +520,7 @@ export default function App() {
                 ) : (
                   <>
                     <p style={S.note}>Correção manual (tem prioridade sobre a API). Vazio = usa o automático.</p>
-                    {porGrupo.map(({ grupo, jogos: js }) => (
-                      <div key={grupo}>
-                        <div style={S.groupHead}>Grupo {grupo}</div>
-                        {js.map(jg => <Jogo key={jg.id} jg={jg} modo="admin" />)}
-                      </div>
-                    ))}
+                    {renderConteudo("admin")}
                   </>
                 )}
               </div>
@@ -463,7 +531,7 @@ export default function App() {
 
       <footer style={S.footer} onClick={() => setRegrasAbertas(true)}>
         <div style={S.sb}>
-          <span>Exato <b style={{ color: C.green }}>+{PONTOS.exato}</b></span>
+          <span>Exato <b style={{ color: C.green }}>+{MAX_PTS}</b></span>
           <span>Vencedor <b style={{ color: C.gold }}>+{PONTOS.vencedor}</b></span>
           <span>Diferença <b style={{ color: C.gold }}>+{PONTOS.diferenca}</b></span>
           <span>Gols perdedor <b style={{ color: C.gold }}>+{PONTOS.perdedor}</b></span>
@@ -483,7 +551,7 @@ export default function App() {
 
               <h4 style={S.helpSub}>Pontuação</h4>
               <div style={S.ptList}>
-                <div style={S.ptRow}><span style={{...S.ptDot, background: C.green}} /><span style={S.ptName}>Cravar o placar exato</span><span style={S.ptVal}>{PONTOS.exato}</span></div>
+                <div style={S.ptRow}><span style={{...S.ptDot, background: C.green}} /><span style={S.ptName}>Cravar o placar exato</span><span style={S.ptVal}>{MAX_PTS}</span></div>
                 <div style={S.ptRow}><span style={{...S.ptDot, background: "#3b7fd4"}} /><span style={S.ptName}>Acertar vencedor + diferença de gols</span><span style={S.ptVal}>{PONTOS.vencedor + PONTOS.diferenca}</span></div>
                 <div style={S.ptRow}><span style={{...S.ptDot, background: "#2bb3b3"}} /><span style={S.ptName}>Acertar vencedor + gols do perdedor</span><span style={S.ptVal}>{PONTOS.vencedor + PONTOS.perdedor}</span></div>
                 <div style={S.ptRow}><span style={{...S.ptDot, background: C.gold}} /><span style={S.ptName}>Acertar só o vencedor / só o empate</span><span style={S.ptVal}>{PONTOS.vencedor}</span></div>
@@ -547,6 +615,11 @@ const S = {
   syncBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 18px 8px", fontSize: 11.5 },
   syncBtn: { background: C.greenSoft, border: "none", color: C.greenDark, borderRadius: 8, padding: "4px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" },
   rodadaBar: { display: "flex", gap: 6, padding: "0 14px 8px" },
+  visaoBar: { display: "flex", gap: 6, padding: "0 14px 8px" },
+  visaoBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 9, padding: "8px 4px", fontSize: 12.5, fontWeight: 800, cursor: "pointer" },
+  visaoOn: { background: C.greenSoft, color: C.greenDark, borderColor: C.green },
+  dayHoje: { color: C.green },
+  grpTag: { color: C.inkSoft, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .4, margin: "0 2px 4px" },
   rodadaBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 9, padding: "7px 4px", fontSize: 12, fontWeight: 700, cursor: "pointer" },
   rodadaOn: { background: C.ink, color: C.white, borderColor: C.ink },
   note: { color: C.inkSoft, fontSize: 12.5, margin: "4px 4px 12px", lineHeight: 1.4 },
@@ -558,9 +631,9 @@ const S = {
   lock: { color: C.red, fontSize: 9.5, fontWeight: 800, background: "#fbeae6", borderRadius: 6, padding: "2px 7px" },
   noPts: { color: C.inkSoft, fontSize: 9.5, fontWeight: 800, background: C.soft, borderRadius: 6, padding: "2px 7px" },
   savedTag: { color: C.green, fontSize: 9.5, fontWeight: 800, background: C.greenSoft, borderRadius: 6, padding: "2px 7px" },
-  othersBox: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` },
-  othersTitle: { color: C.inkSoft, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 },
-  othersList: { display: "flex", flexDirection: "column", gap: 4 },
+  othersWrap: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` },
+  othersToggle: { width: "100%", background: C.soft, border: "none", borderRadius: 9, padding: "9px", color: C.greenDark, fontSize: 12, fontWeight: 800, cursor: "pointer" },
+  othersList: { display: "flex", flexDirection: "column", gap: 4, marginTop: 8 },
   otherRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "3px 6px", borderRadius: 7 },
   otherMe: { background: C.greenSoft },
   otherName: { flex: 1, color: C.ink, fontWeight: 600 },
