@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase, ADMIN_PASSWORD, TRAVA_MINUTOS, LEAGUE_ID, API_KEY, PONTOS } from "./config";
 import { JOGOS_OFICIAIS, bandeira } from "./jogos";
-import Paroquia from "./Paroquia";
 
 // Paleta clara — verde só como destaque
 const C = {
@@ -35,9 +34,7 @@ function calcPontos(palpite, resultado) {
   const pc = +palpite.casa, pf = +palpite.fora, rc = +resultado.casa, rf = +resultado.fora;
   if (pc === rc && pf === rf) return PONTOS.exato;
   const s = (a, b) => (a > b ? 1 : a < b ? -1 : 0);
-  const venceu = s(pc, pf) === s(rc, rf);
-  if (venceu && (pc === rc || pf === rf)) return PONTOS.parcial;
-  if (venceu) return PONTOS.resultado;
+  if (s(pc, pf) === s(rc, rf)) return PONTOS.resultado;
   return PONTOS.erro;
 }
 function fmtData(iso) {
@@ -55,7 +52,6 @@ function jogoFechado(jogo, resultado) {
 
 export default function App() {
   const [tab, setTab] = useState("palpites");
-  const [modo, setModo] = useState("copa"); // "copa" ou "paroquia"
   const [rodada, setRodada] = useState(1);
   const [jogos, setJogos] = useState(JOGOS_OFICIAIS);
   const [resultadosManuais, setResultadosManuais] = useState({});
@@ -151,25 +147,32 @@ export default function App() {
 
   async function criarConta() {
     const n = nome.trim(); if (!n || !senha) { setAuthMsg("Preencha nome e senha."); return; }
+    const dono = localStorage.getItem("bolao:dono");
+    if (dono) { setAuthMsg(`Este dispositivo já tem a conta "${dono}". Entre com ela.`); return; }
     setCarregandoAuth(true); setAuthMsg("");
     const { data: existe } = await supabase.from("usuarios").select("nome").eq("nome", n).maybeSingle();
     if (existe) { setAuthMsg("Esse nome já existe. Tente entrar."); setCarregandoAuth(false); return; }
     const { error } = await supabase.from("usuarios").insert({ nome: n, senha });
     setCarregandoAuth(false);
     if (error) { setAuthMsg("Erro ao criar conta."); return; }
+    localStorage.setItem("bolao:dono", n);
     localStorage.setItem("bolao:auth", JSON.stringify({ nome: n }));
     setLogado(true); carregarBanco();
   }
   async function entrar() {
     const n = nome.trim(); if (!n || !senha) { setAuthMsg("Preencha nome e senha."); return; }
+    const dono = localStorage.getItem("bolao:dono");
+    if (dono && dono !== n) { setAuthMsg(`Este dispositivo está vinculado à conta "${dono}".`); return; }
     setCarregandoAuth(true); setAuthMsg("");
     const { data: u } = await supabase.from("usuarios").select("*").eq("nome", n).maybeSingle();
     setCarregandoAuth(false);
     if (!u) { setAuthMsg("Conta não encontrada. Crie uma conta."); return; }
     if (u.senha !== senha) { setAuthMsg("Senha incorreta."); return; }
+    localStorage.setItem("bolao:dono", n);
     localStorage.setItem("bolao:auth", JSON.stringify({ nome: n }));
     setLogado(true); carregarBanco();
   }
+  // "sair" desloga mas mantém o vínculo do dispositivo (trava 1 conta por navegador)
   function sair() { localStorage.removeItem("bolao:auth"); setLogado(false); setIsAdmin(false); setAdminAberto(false); setSenha(""); setTab("palpites"); }
 
   async function salvarPalpite(jogoId, campo, valor) {
@@ -293,15 +296,8 @@ export default function App() {
             <button style={S.ghost} onClick={sair}>sair</button>
           </div>
 
-          <div style={S.modoBar}>
-            <button onClick={() => { setModo("copa"); setTab("palpites"); }} style={{ ...S.modoBtn, ...(modo === "copa" ? S.modoOn : {}) }}>🏆 Bolão da Copa</button>
-            <button onClick={() => { setModo("paroquia"); setTab("palpites"); }} style={{ ...S.modoBtn, ...(modo === "paroquia" ? S.modoOn : {}) }}>⛪ Bolão Solidário</button>
-          </div>
+          {/* Bolão Solidário oculto — para reativar, restaure o seletor de modo e o bloco {modo === "paroquia" ...} (componente Paroquia continua no projeto). */}
 
-          {modo === "paroquia" ? (
-            <Paroquia nome={nome} isAdmin={isAdmin} />
-          ) : (
-          <>
           <nav style={S.tabs}>
             {[["palpites","Palpites"],["ranking","Ranking"],["resultados","Resultados"], ...(adminAberto ? [["admin","Admin"]] : [])].map(([k,l]) => (
               <button key={k} onClick={() => setTab(k)} style={{ ...S.tab, ...(tab === k ? S.tabOn : {}) }}>{l}</button>
@@ -386,16 +382,13 @@ export default function App() {
               </div>
             )}
           </main>
-          </>
-          )}
         </>
       )}
 
       <footer style={S.footer}>
         <div style={S.sb}>
-          <span>Exato <b style={{ color: C.green }}>+{PONTOS.exato}</b></span>
-          <span>Vencedor+1 placar <b style={{ color: C.gold }}>+{PONTOS.parcial}</b></span>
-          <span>Só vencedor <b style={{ color: C.gold }}>+{PONTOS.resultado}</b></span>
+          <span>Placar exato <b style={{ color: C.green }}>+{PONTOS.exato}</b></span>
+          <span>Acertar o resultado <b style={{ color: C.gold }}>+{PONTOS.resultado}</b></span>
         </div>
       </footer>
     </div>
@@ -416,9 +409,6 @@ const S = {
   btn2: { width: "100%", background: C.white, color: C.green, border: `1.5px solid ${C.green}`, borderRadius: 12, padding: 12.5, fontWeight: 800, fontSize: 14, cursor: "pointer" },
   hint: { color: C.inkSoft, fontSize: 12, marginTop: 10, lineHeight: 1.45 },
   userbar: { display: "flex", alignItems: "center", padding: "4px 18px 8px", fontSize: 14 },
-  modoBar: { display: "flex", gap: 8, padding: "0 14px 10px" },
-  modoBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 12, padding: "11px 6px", fontSize: 13, fontWeight: 800, cursor: "pointer" },
-  modoOn: { background: C.ink, color: C.white, borderColor: C.ink },
   ghost: { marginLeft: "auto", background: "transparent", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 8, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 },
   tabs: { display: "flex", gap: 6, padding: "2px 14px 8px" },
   tab: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 11, padding: "10px 4px", fontSize: 13, fontWeight: 700, cursor: "pointer" },
