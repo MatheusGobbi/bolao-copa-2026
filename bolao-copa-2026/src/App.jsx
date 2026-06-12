@@ -32,10 +32,32 @@ function calcPontos(palpite, resultado) {
   if (!resultado || resultado.casa == null || resultado.fora == null) return null;
   if (!palpite || palpite.casa == null || palpite.casa === "" || palpite.fora == null || palpite.fora === "") return null;
   const pc = +palpite.casa, pf = +palpite.fora, rc = +resultado.casa, rf = +resultado.fora;
-  if (pc === rc && pf === rf) return PONTOS.exato;
+  const empateReal = rc === rf;
+  // placar exato
+  if (pc === rc && pf === rf) {
+    return empateReal
+      ? PONTOS.exato + PONTOS.vencedor                                  // empate cravado
+      : PONTOS.exato + PONTOS.vencedor + PONTOS.diferenca + PONTOS.perdedor; // vitória cravada
+  }
   const s = (a, b) => (a > b ? 1 : a < b ? -1 : 0);
-  if (s(pc, pf) === s(rc, rf)) return PONTOS.resultado;
-  return PONTOS.erro;
+  // errou o vencedor (ou empate vs vitória) → 0
+  if (s(pc, pf) !== s(rc, rf)) return 0;
+  // acertou o vencedor / empate
+  let pts = PONTOS.vencedor;
+  if (!empateReal) {
+    // diferença de gols (margem da vitória)
+    if (Math.abs(pc - pf) === Math.abs(rc - rf)) pts += PONTOS.diferenca;
+    // gols do time perdedor
+    const perdedorPalpite = pc < pf ? pc : pf;
+    const perdedorReal = rc < rf ? rc : rf;
+    if (perdedorPalpite === perdedorReal) pts += PONTOS.perdedor;
+  }
+  return pts;
+}
+const MAX_PTS = PONTOS.exato + PONTOS.vencedor + PONTOS.diferenca + PONTOS.perdedor; // 11
+function ehExato(p, r) {
+  if (!p || !r || p.casa == null || p.fora == null || r.casa == null || r.fora == null) return false;
+  return +p.casa === +r.casa && +p.fora === +r.fora;
 }
 function fmtData(iso) {
   if (!iso) return "data a definir";
@@ -66,6 +88,7 @@ export default function App() {
   const [carregandoAuth, setCarregandoAuth] = useState(false);
   const [acaoAuth, setAcaoAuth] = useState(null); // "entrar" | "criar" | null
   const [salvando, setSalvando] = useState(false);
+  const [regrasAbertas, setRegrasAbertas] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminAberto, setAdminAberto] = useState(false); // tela admin visível?
@@ -206,8 +229,9 @@ export default function App() {
       const pal = palpitesTodos[jogador] || {};
       for (const jg of jogos) {
         if (jg.semPontos) continue; // jogos de abertura não contam
-        const p = calcPontos(pal[jg.id], resultadoFinal(jg.id, jg.casa, jg.fora));
-        if (p != null) { total += p; jogados++; if (p === PONTOS.exato) exatos++; }
+        const r = resultadoFinal(jg.id, jg.casa, jg.fora);
+        const p = calcPontos(pal[jg.id], r);
+        if (p != null) { total += p; jogados++; if (ehExato(pal[jg.id], r)) exatos++; }
       }
       return { jogador, total, exatos, jogados };
     }).sort((a, b) => b.total - a.total || b.exatos - a.exatos || a.jogador.localeCompare(b.jogador));
@@ -274,7 +298,7 @@ export default function App() {
         </div>
         {modo === "palpite" && tem && (
           <div style={S.resLine}>Final {res.casa} × {res.fora}
-            <span style={{ ...S.badge, background: pts === PONTOS.exato ? C.green : pts > 0 ? C.gold : C.red }}>{pts != null ? `+${pts} pts` : "sem palpite"}</span>
+            <span style={{ ...S.badge, background: ehExato(p, res) ? C.green : pts > 0 ? C.gold : C.red }}>{pts != null ? `+${pts} pts` : "sem palpite"}</span>
           </div>
         )}
         {palpitesDoJogo.length > 0 && (
@@ -287,7 +311,7 @@ export default function App() {
                   <div key={u} style={{ ...S.otherRow, ...(u === nome ? S.otherMe : {}) }}>
                     <span style={S.otherName}>{u}</span>
                     <span style={S.otherScore}>{pal.casa} × {pal.fora}</span>
-                    {tem && ap != null && <span style={{ ...S.otherPts, color: ap === PONTOS.exato ? C.green : ap > 0 ? C.gold : C.inkSoft }}>{jg.semPontos ? "—" : `+${ap}`}</span>}
+                    {tem && ap != null && <span style={{ ...S.otherPts, color: ehExato(pal, res) ? C.green : ap > 0 ? C.gold : C.inkSoft }}>{jg.semPontos ? "—" : `+${ap}`}</span>}
                   </div>
                 );
               })}
@@ -437,12 +461,62 @@ export default function App() {
         </>
       )}
 
-      <footer style={S.footer}>
+      <footer style={S.footer} onClick={() => setRegrasAbertas(true)}>
         <div style={S.sb}>
-          <span>Placar exato <b style={{ color: C.green }}>+{PONTOS.exato}</b></span>
-          <span>Acertar o resultado <b style={{ color: C.gold }}>+{PONTOS.resultado}</b></span>
+          <span>Exato <b style={{ color: C.green }}>+{PONTOS.exato}</b></span>
+          <span>Vencedor <b style={{ color: C.gold }}>+{PONTOS.vencedor}</b></span>
+          <span>Diferença <b style={{ color: C.gold }}>+{PONTOS.diferenca}</b></span>
+          <span>Gols perdedor <b style={{ color: C.gold }}>+{PONTOS.perdedor}</b></span>
         </div>
+        <div style={S.footerHint}>toque para ver as regras completas</div>
       </footer>
+
+      {regrasAbertas && (
+        <div style={S.modalBg} onClick={() => setRegrasAbertas(false)}>
+          <div style={S.modal} onClick={e => e.stopPropagation()}>
+            <div style={S.modalHead}>
+              <h3 style={S.modalTitle}>Como funciona</h3>
+              <button style={S.modalX} onClick={() => setRegrasAbertas(false)}>×</button>
+            </div>
+            <div style={S.modalBody}>
+              <p style={S.helpP}>Dê seu palpite de placar para cada jogo. Os palpites fecham {TRAVA_MINUTOS} minutos antes de cada jogo — depois não dá mais para alterar. Quando o jogo termina, os pontos entram no ranking automaticamente.</p>
+
+              <h4 style={S.helpSub}>Pontuação</h4>
+              <div style={S.ptList}>
+                <div style={S.ptRow}><span style={{...S.ptDot, background: C.green}} /><span style={S.ptName}>Cravar o placar exato</span><span style={S.ptVal}>{PONTOS.exato}</span></div>
+                <div style={S.ptRow}><span style={{...S.ptDot, background: "#3b7fd4"}} /><span style={S.ptName}>Acertar vencedor + diferença de gols</span><span style={S.ptVal}>{PONTOS.vencedor + PONTOS.diferenca}</span></div>
+                <div style={S.ptRow}><span style={{...S.ptDot, background: "#2bb3b3"}} /><span style={S.ptName}>Acertar vencedor + gols do perdedor</span><span style={S.ptVal}>{PONTOS.vencedor + PONTOS.perdedor}</span></div>
+                <div style={S.ptRow}><span style={{...S.ptDot, background: C.gold}} /><span style={S.ptName}>Acertar só o vencedor / só o empate</span><span style={S.ptVal}>{PONTOS.vencedor}</span></div>
+                <div style={S.ptRow}><span style={{...S.ptDot, background: C.red}} /><span style={S.ptName}>Errar quem ganhou</span><span style={S.ptVal}>0</span></div>
+              </div>
+              <p style={S.helpNote}>Cravar o placar é sempre a maior pontuação ({MAX_PTS} pontos), valendo igual para vitórias e empates. As faixas de diferença e gols do perdedor só contam se você acertou quem ganhou.</p>
+
+              <h4 style={S.helpSub}>Exemplos · resultado real 3 × 1</h4>
+              <div style={S.exBox}>
+                <div style={S.exRow}><span>Palpitou 3×1 — cravou</span><b style={{color:C.green}}>{MAX_PTS} pts</b></div>
+                <div style={S.exRow}><span>Palpitou 2×0 — vencedor + diferença</span><b>{PONTOS.vencedor + PONTOS.diferenca} pts</b></div>
+                <div style={S.exRow}><span>Palpitou 4×1 — vencedor + gols do perdedor</span><b>{PONTOS.vencedor + PONTOS.perdedor} pts</b></div>
+                <div style={S.exRow}><span>Palpitou 5×0 — só o vencedor</span><b>{PONTOS.vencedor} pts</b></div>
+                <div style={S.exRow}><span>Palpitou 1×2 — errou quem ganhou</span><b style={{color:C.red}}>0 pts</b></div>
+              </div>
+
+              <h4 style={S.helpSub}>Exemplos · empate 2 × 2</h4>
+              <div style={S.exBox}>
+                <div style={S.exRow}><span>Palpitou 2×2 — cravou o empate</span><b style={{color:C.green}}>{MAX_PTS} pts</b></div>
+                <div style={S.exRow}><span>Palpitou 1×1 — acertou que era empate</span><b>{PONTOS.vencedor} pts</b></div>
+                <div style={S.exRow}><span>Palpitou 2×0 — previu vitória</span><b style={{color:C.red}}>0 pts</b></div>
+              </div>
+              <p style={S.helpNote}>Em empates não há margem nem perdedor: vale cravar o placar ({MAX_PTS}) ou acertar que seria empate ({PONTOS.vencedor}).</p>
+
+              <h4 style={S.helpSub}>Outras regras</h4>
+              <p style={S.helpP}>O ranking mostra todos os participantes e atualiza sozinho. Quando um jogo fecha, você vê os palpites de todos naquele jogo. Os dois jogos de abertura (11/06) não valem pontos. Empate no ranking é desempatado por número de placares exatos.</p>
+            </div>
+            <div style={S.modalFoot}>
+              <button style={S.modalBtn} onClick={() => setRegrasAbertas(false)}>Entendi</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -507,6 +581,25 @@ const S = {
   rkName: { fontWeight: 700, fontSize: 15 },
   rkMeta: { marginLeft: "auto", color: C.inkSoft, fontSize: 10.5, fontWeight: 600 },
   rkPts: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 23, color: C.green, fontWeight: 800, minWidth: 34, textAlign: "right" },
-  footer: { position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 480, margin: "0 auto", background: C.surface, borderTop: `1px solid ${C.line}`, padding: "9px 14px" },
+  footer: { position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 480, margin: "0 auto", background: C.surface, borderTop: `1px solid ${C.line}`, padding: "8px 14px 7px", cursor: "pointer" },
+  footerHint: { textAlign: "center", fontSize: 9.5, color: C.green, fontWeight: 700, marginTop: 4, letterSpacing: .2 },
+  modalBg: { position: "fixed", inset: 0, background: "rgba(10,20,12,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 60 },
+  modal: { background: C.white, borderRadius: 20, maxWidth: 420, width: "100%", maxHeight: "86vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" },
+  modalHead: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: `1px solid ${C.line}` },
+  modalTitle: { margin: 0, fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 19, fontWeight: 800, color: C.ink },
+  modalX: { background: C.soft, border: "none", borderRadius: 9, width: 32, height: 32, fontSize: 20, color: C.inkSoft, cursor: "pointer", lineHeight: 1 },
+  modalBody: { padding: "16px 18px", overflowY: "auto" },
+  modalFoot: { padding: "12px 18px", borderTop: `1px solid ${C.line}` },
+  modalBtn: { width: "100%", background: C.green, color: C.white, border: "none", borderRadius: 11, padding: 13, fontWeight: 800, fontSize: 14.5, cursor: "pointer" },
+  helpSub: { fontSize: 14, color: C.ink, margin: "18px 0 7px", fontWeight: 800 },
+  helpP: { fontSize: 13, color: C.inkSoft, lineHeight: 1.55, margin: "0 0 4px" },
+  helpNote: { fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5, margin: "10px 0 0", background: C.soft, borderRadius: 9, padding: "10px 12px" },
+  ptList: { display: "flex", flexDirection: "column", gap: 2, margin: "4px 0" },
+  ptRow: { display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: `1px solid ${C.line}` },
+  ptDot: { width: 11, height: 11, borderRadius: "50%", flexShrink: 0 },
+  ptName: { flex: 1, fontSize: 13, color: C.ink, fontWeight: 600 },
+  ptVal: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 800, color: C.green },
+  exBox: { background: C.soft, borderRadius: 11, padding: "10px 14px", marginBottom: 4 },
+  exRow: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, color: C.ink, padding: "4px 0" },
   sb: { display: "flex", justifyContent: "space-around", gap: 6, fontSize: 10.5, color: C.inkSoft, textAlign: "center", flexWrap: "wrap", fontWeight: 600 },
 };
