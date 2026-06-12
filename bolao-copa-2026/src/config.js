@@ -10,7 +10,7 @@ const SUPABASE_URL = "https://cfzgvstgqbuuvyxxmvqe.supabase.co";
 // 2) >>> COLE AQUI a chave "anon public" <<<
 //    Supabase > Project Settings > API > Project API keys > "anon public"
 //    Apague o texto COLE_SUA_CHAVE_ANON_AQUI e ponha a chave longa entre as aspas.
-const SUPABASE_ANON_KEY = "COLE_SUA_CHAVE_ANON_AQUI";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmemd2c3RncWJ1dXZ5eHhtdnFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTkyNTksImV4cCI6MjA5NTk5NTI1OX0.T7dB_F3il0o6plin8n4p4WSxO9xG3Ch2BavMqZy5DMw";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
