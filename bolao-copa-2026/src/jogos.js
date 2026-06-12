@@ -24,8 +24,8 @@ export const bandeira = (time) => BANDEIRAS[time] || "🏳️";
 
 export const JOGOS_OFICIAIS = [
   // ===== 1ª RODADA =====
-  { id: "wc01", grupo: "A", rodada: 1, casa: "México",          fora: "África do Sul",        iso: "2026-06-11T19:00:00Z" },
-  { id: "wc02", grupo: "A", rodada: 1, casa: "Coreia do Sul",   fora: "República Tcheca",     iso: "2026-06-12T02:00:00Z" },
+  { id: "wc01", grupo: "A", rodada: 1, casa: "México",          fora: "África do Sul",        iso: "2026-06-11T19:00:00Z", semPontos: true },
+  { id: "wc02", grupo: "A", rodada: 1, casa: "Coreia do Sul",   fora: "República Tcheca",     iso: "2026-06-12T02:00:00Z", semPontos: true },
   { id: "wc03", grupo: "B", rodada: 1, casa: "Canadá",          fora: "Bósnia e Herzegovina", iso: "2026-06-12T19:00:00Z" },
   { id: "wc04", grupo: "D", rodada: 1, casa: "Estados Unidos",  fora: "Paraguai",             iso: "2026-06-13T01:00:00Z" },
   { id: "wc05", grupo: "B", rodada: 1, casa: "Catar",           fora: "Suíça",                iso: "2026-06-13T19:00:00Z" },
