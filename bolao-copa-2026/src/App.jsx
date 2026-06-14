@@ -518,12 +518,6 @@ export default function App() {
 
           {/* Bolão Solidário oculto — para reativar, restaure o seletor de modo e o bloco {modo === "paroquia" ...} (componente Paroquia continua no projeto). */}
 
-          <nav style={S.tabs}>
-            {[["palpites","Palpites"],["ranking","Ranking"],["resultados","Resultados"], ...(adminAberto ? [["admin","Admin"]] : [])].map(([k,l]) => (
-              <button key={k} onClick={() => setTab(k)} style={{ ...S.tab, ...(tab === k ? S.tabOn : {}) }}>{l}</button>
-            ))}
-          </nav>
-
           <div style={S.syncBar}>
             <span style={{ color: syncStatus === "erro" ? C.red : C.inkSoft }}>{syncLabel}</span>
             <button style={S.syncBtn} onClick={sincronizar} disabled={syncStatus === "sincronizando"}>atualizar</button>
@@ -531,9 +525,10 @@ export default function App() {
 
           {(tab === "palpites" || tab === "resultados" || tab === "admin") && (
             <>
-              <div style={S.visaoBar}>
-                <button onClick={() => setVisao("grupo")} style={{ ...S.visaoBtn, ...(visao === "grupo" ? S.visaoOn : {}) }}>Por grupo</button>
-                <button onClick={() => setVisao("dia")} style={{ ...S.visaoBtn, ...(visao === "dia" ? S.visaoOn : {}) }}>Por dia</button>
+              <div style={S.ordenarBar}>
+                <span style={S.ordenarLbl}>Ordenar jogos:</span>
+                <button onClick={() => setVisao("dia")} style={{ ...S.visaoBtn, ...(visao === "dia" ? S.visaoOn : {}) }}>📅 Por dia</button>
+                <button onClick={() => setVisao("grupo")} style={{ ...S.visaoBtn, ...(visao === "grupo" ? S.visaoOn : {}) }}>🏆 Por grupo</button>
               </div>
               {visao === "grupo" && (
                 <div style={S.rodadaBar}>
@@ -598,15 +593,31 @@ export default function App() {
         </>
       )}
 
-      <footer style={S.footer} onClick={() => setRegrasAbertas(true)}>
-        <div style={S.sb}>
-          <span>Exato <b style={{ color: C.green }}>+{MAX_PTS}</b></span>
-          <span>Vencedor <b style={{ color: C.gold }}>+{PONTOS.vencedor}</b></span>
-          <span>Diferença <b style={{ color: C.gold }}>+{PONTOS.diferenca}</b></span>
-          <span>Gols perdedor <b style={{ color: C.gold }}>+{PONTOS.perdedor}</b></span>
+      {/* Botões flutuantes: Hoje (só na visão por dia) e Topo */}
+      {logado && (
+        <div style={S.fabWrap}>
+          {visao === "dia" && (tab === "palpites" || tab === "resultados" || tab === "admin") && (
+            <button style={S.fabHoje} onClick={() => {
+              const alvo = document.querySelector('[data-hoje="1"]') || document.querySelector('[data-proximo="1"]');
+              if (alvo) alvo.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}>📅 Hoje</button>
+          )}
+          <button style={S.fabTopo} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Voltar ao topo">↑</button>
         </div>
-        <div style={S.footerHint}>toque para ver as regras completas</div>
-      </footer>
+      )}
+
+      {/* Navbar de navegação fixo embaixo */}
+      {logado && (
+        <nav style={S.navbar}>
+          {[["palpites","Palpites","⚽"],["ranking","Ranking","🏆"],["resultados","Resultados","📊"],["regras","Regras","ℹ️"], ...(adminAberto ? [["admin","Admin","🔧"]] : [])].map(([k,l,ic]) => (
+            <button key={k} onClick={() => { if (k === "regras") { setRegrasAbertas(true); } else { setTab(k); } }}
+              style={{ ...S.navBtn, ...(tab === k ? S.navBtnOn : {}) }}>
+              <span style={S.navIcon}>{ic}</span>
+              <span style={S.navLbl}>{l}</span>
+            </button>
+          ))}
+        </nav>
+      )}
 
       {regrasAbertas && (
         <div style={S.modalBg} onClick={() => setRegrasAbertas(false)}>
@@ -659,7 +670,7 @@ export default function App() {
 }
 
 const S = {
-  app: { background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "Manrope, sans-serif", color: C.ink, paddingBottom: 78 },
+  app: { background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "Manrope, sans-serif", color: C.ink, paddingBottom: 88 },
   header: { textAlign: "center", padding: "26px 16px 14px" },
   kicker: { color: C.green, letterSpacing: 2.5, fontSize: 10.5, fontWeight: 800 },
   title: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 44, margin: "2px 0", color: C.ink, fontWeight: 800, letterSpacing: -1, cursor: "default", userSelect: "none" },
@@ -678,15 +689,14 @@ const S = {
   hint: { color: C.inkSoft, fontSize: 12, marginTop: 10, lineHeight: 1.45 },
   userbar: { display: "flex", alignItems: "center", padding: "4px 18px 8px", fontSize: 14 },
   ghost: { marginLeft: "auto", background: "transparent", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 8, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 },
-  tabs: { display: "flex", gap: 6, padding: "2px 14px 8px" },
-  tab: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 11, padding: "10px 4px", fontSize: 13, fontWeight: 700, cursor: "pointer" },
-  tabOn: { background: C.green, color: C.white, borderColor: C.green },
+  ordenarBar: { display: "flex", gap: 6, padding: "0 14px 8px", alignItems: "center" },
+  ordenarLbl: { fontSize: 11.5, color: C.inkSoft, fontWeight: 700, marginRight: 2, whiteSpace: "nowrap" },
+  visaoBar: { display: "flex", gap: 6, padding: "0 14px 8px" },
+  visaoBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 9, padding: "8px 6px", fontSize: 12.5, fontWeight: 800, cursor: "pointer" },
+  visaoOn: { background: C.greenSoft, color: C.greenDark, borderColor: C.green },
   syncBar: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 18px 8px", fontSize: 11.5 },
   syncBtn: { background: C.greenSoft, border: "none", color: C.greenDark, borderRadius: 8, padding: "4px 12px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" },
   rodadaBar: { display: "flex", gap: 6, padding: "0 14px 8px" },
-  visaoBar: { display: "flex", gap: 6, padding: "0 14px 8px" },
-  visaoBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 9, padding: "8px 4px", fontSize: 12.5, fontWeight: 800, cursor: "pointer" },
-  visaoOn: { background: C.greenSoft, color: C.greenDark, borderColor: C.green },
   dayHoje: { color: C.green },
   grpTag: { color: C.inkSoft, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: .4, margin: "0 2px 4px" },
   rodadaBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 9, padding: "7px 4px", fontSize: 12, fontWeight: 700, cursor: "pointer" },
@@ -724,8 +734,14 @@ const S = {
   rkName: { fontWeight: 700, fontSize: 15 },
   rkMeta: { marginLeft: "auto", color: C.inkSoft, fontSize: 10.5, fontWeight: 600 },
   rkPts: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 23, color: C.green, fontWeight: 800, minWidth: 34, textAlign: "right" },
-  footer: { position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 480, margin: "0 auto", background: C.surface, borderTop: `1px solid ${C.line}`, padding: "8px 14px 7px", cursor: "pointer" },
-  footerHint: { textAlign: "center", fontSize: 9.5, color: C.green, fontWeight: 700, marginTop: 4, letterSpacing: .2 },
+  navbar: { position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 480, margin: "0 auto", background: C.surface, borderTop: `1px solid ${C.line}`, display: "flex", padding: "6px 4px", boxShadow: "0 -2px 12px rgba(20,40,25,0.06)", zIndex: 40 },
+  navBtn: { flex: 1, background: "transparent", border: "none", color: C.inkSoft, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "5px 2px", cursor: "pointer", borderRadius: 10 },
+  navBtnOn: { color: C.green },
+  navIcon: { fontSize: 18, lineHeight: 1 },
+  navLbl: { fontSize: 10.5, fontWeight: 800 },
+  fabWrap: { position: "fixed", left: 0, right: 0, maxWidth: 480, margin: "0 auto", bottom: 80, padding: "0 14px", display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", zIndex: 45, pointerEvents: "none" },
+  fabHoje: { background: C.green, color: C.white, border: "none", borderRadius: 22, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 14px rgba(31,138,76,0.4)", pointerEvents: "auto" },
+  fabTopo: { background: C.surface, color: C.ink, border: `1px solid ${C.line}`, borderRadius: "50%", width: 44, height: 44, fontSize: 20, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 14px rgba(20,40,25,0.15)", pointerEvents: "auto" },
   modalBg: { position: "fixed", inset: 0, background: "rgba(10,20,12,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 60 },
   modal: { background: C.white, borderRadius: 20, maxWidth: 420, width: "100%", maxHeight: "86vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" },
   modalHead: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderBottom: `1px solid ${C.line}` },
@@ -744,5 +760,5 @@ const S = {
   ptVal: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 800, color: C.green },
   exBox: { background: C.soft, borderRadius: 11, padding: "10px 14px", marginBottom: 4 },
   exRow: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, color: C.ink, padding: "4px 0" },
-  sb: { display: "flex", justifyContent: "space-around", gap: 6, fontSize: 10.5, color: C.inkSoft, textAlign: "center", flexWrap: "wrap", fontWeight: 600 },
+  sb: { display: "none" },
 };
