@@ -377,6 +377,7 @@ export default function App() {
     const temManual = m.casa != null && m.fora != null;
     const aoVivo = !temManual && !!(a && a.aoVivo); // ao vivo só se o admin não fixou um placar
     const meuPreenchido = p.casa != null && p.fora != null;
+    const encerrado = tem && !aoVivo; // jogo já finalizado (tem resultado e não está ao vivo)
     // palpites dos outros (só quando o jogo fechou) — usa dados já em memória
     const palpitesDoJogo = (modo === "palpite" && fechado)
       ? usuarios
@@ -384,12 +385,13 @@ export default function App() {
           .filter(o => o.pal && o.pal.casa != null && o.pal.fora != null)
       : [];
     return (
-      <div style={S.match}>
+      <div style={{ ...S.match, ...(encerrado ? S.matchEncerrado : {}), ...(aoVivo ? S.matchAoVivo : {}) }}>
         <div style={S.mTop}>
           <span style={S.dt}>{fmtData(jg.iso)}</span>
           <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {jg.semPontos && <span style={S.noPts}>não vale pontos</span>}
             {aoVivo && <span style={S.liveTag}>🔴 AO VIVO</span>}
+            {encerrado && <span style={S.encerradoTag}>encerrado</span>}
             {modo === "palpite" && !fechado && meuPreenchido && <span style={S.savedTag}>✓ salvo</span>}
             {modo === "palpite" && fechado && !tem && <span style={S.lock}>fechado</span>}
             {modo === "admin" && <span style={S.dt}>{a ? `API ${a.casa}×${a.fora}` : "API —"}</span>}
@@ -448,14 +450,18 @@ export default function App() {
   // renderiza os jogos conforme a visão escolhida (grupo ou dia)
   const renderConteudo = (modo) => {
     if (visao === "dia") {
-      return porDia.map(({ dia, jogos: js }) => (
-        <div key={dia} data-hoje={dia === hojeChave ? "1" : undefined} data-proximo={dia === proximoDiaComJogos ? "1" : undefined}>
-          <div style={{ ...S.groupHead, ...(dia === hojeChave ? S.dayHoje : {}) }}>
-            {labelDia(dia)}{dia === hojeChave ? " · hoje" : ""}
+      return porDia.map(({ dia, jogos: js }) => {
+        const ehHoje = dia === hojeChave;
+        return (
+          <div key={dia} data-hoje={ehHoje ? "1" : undefined} data-proximo={dia === proximoDiaComJogos ? "1" : undefined} style={ehHoje ? S.hojeBloco : undefined}>
+            <div style={{ ...S.diaHead, ...(ehHoje ? S.diaHeadHoje : {}) }}>
+              <span>{labelDia(dia)}</span>
+              {ehHoje && <span style={S.hojeSelo}>HOJE</span>}
+            </div>
+            {js.map(jg => <div key={jg.id}><div style={S.grpTag}>Grupo {jg.grupo}{jg.rodada ? ` · ${jg.rodada}ª rodada` : ""}</div><Jogo jg={jg} modo={modo} /></div>)}
           </div>
-          {js.map(jg => <div key={jg.id}><div style={S.grpTag}>Grupo {jg.grupo}{jg.rodada ? ` · ${jg.rodada}ª rodada` : ""}</div><Jogo jg={jg} modo={modo} /></div>)}
-        </div>
-      ));
+        );
+      });
     }
     return porGrupo.map(({ grupo, jogos: js }) => (
       <div key={grupo}>
@@ -704,7 +710,14 @@ const S = {
   note: { color: C.inkSoft, fontSize: 12.5, margin: "4px 4px 12px", lineHeight: 1.4 },
   empty: { color: C.inkSoft, textAlign: "center", padding: 30 },
   groupHead: { color: C.greenDark, fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 15, fontWeight: 800, margin: "16px 2px 8px", letterSpacing: -0.3 },
-  match: { background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "12px 14px", marginBottom: 9, boxShadow: "0 2px 8px rgba(20,40,25,0.03)" },
+  diaHead: { display: "flex", alignItems: "center", justifyContent: "space-between", color: C.inkSoft, fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 15, fontWeight: 800, margin: "16px 2px 8px", letterSpacing: -0.3 },
+  diaHeadHoje: { color: C.greenDark },
+  hojeBloco: { background: "linear-gradient(180deg, rgba(31,138,76,0.07) 0%, rgba(31,138,76,0) 100%)", borderLeft: `3px solid ${C.green}`, borderRadius: "0 12px 12px 0", padding: "2px 8px 8px", margin: "8px 0 4px" },
+  hojeSelo: { background: C.green, color: C.white, fontSize: 10, fontWeight: 800, letterSpacing: 1, padding: "3px 10px", borderRadius: 20 },
+  match: { background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, padding: "12px 14px", marginBottom: 9, boxShadow: "0 2px 8px rgba(20,40,25,0.03)", transition: "opacity .2s" },
+  matchEncerrado: { opacity: 0.62 },
+  matchAoVivo: { borderColor: C.red, boxShadow: `0 0 0 1px ${C.red}33, 0 2px 8px rgba(194,69,47,0.12)` },
+  encerradoTag: { color: C.inkSoft, fontSize: 9.5, fontWeight: 800, background: C.soft, borderRadius: 6, padding: "2px 7px" },
   mTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 },
   dt: { color: C.inkSoft, fontSize: 10.5, textTransform: "capitalize", fontWeight: 600 },
   lock: { color: C.red, fontSize: 9.5, fontWeight: 800, background: "#fbeae6", borderRadius: 6, padding: "2px 7px" },
