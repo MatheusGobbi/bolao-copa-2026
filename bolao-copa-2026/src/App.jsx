@@ -71,7 +71,7 @@ function jogoFechado(jogo, resultado) {
 export default function App() {
   const [tab, setTab] = useState("palpites");
   const [rodada, setRodada] = useState(1);
-  const [visao, setVisao] = useState("grupo"); // "grupo" ou "dia"
+  const [visao, setVisao] = useState("dia"); // "dia" (padrão) ou "grupo"
   const [jogos, setJogos] = useState(JOGOS_OFICIAIS);
   const [resultadosManuais, setResultadosManuais] = useState({});
   const [apiResultados, setApiResultados] = useState({});
@@ -127,37 +127,80 @@ export default function App() {
       for (const r of res) if (r.casa != null && r.fora != null) m[r.jogo_id] = { casa: r.casa, fora: r.fora };
       setResultadosManuais(m);
     }
+    // resultados da API já salvos no banco (permanentes — não somem quando a API "esquece")
+    const { data: rapi } = await supabase.from("resultados_api").select("*");
+    if (rapi) {
+      const a = {};
+      for (const r of rapi) if (r.casa != null && r.fora != null) a[r.jogo_id] = { casa: r.casa, fora: r.fora };
+      setApiResultados(prev => ({ ...a, ...prev })); // mantém o que já estava em memória por cima
+    }
   }, []);
 
   const sincronizar = useCallback(async () => {
     setSyncStatus("sincronizando");
-    const url = `${API_BASE}/eventspastleague.php?id=${LEAGUE_ID}`;
-    console.log("[BOLÃO] Sincronizando resultados…", url);
+    const urlPassados = `${API_BASE}/eventspastleague.php?id=${LEAGUE_ID}`;
+    const urlProximos = `${API_BASE}/eventsnextleague.php?id=${LEAGUE_ID}`;
+    console.log("[BOLÃO] Sincronizando…");
     try {
-      const resp = await fetch(url);
-      console.log("[BOLÃO] Status HTTP:", resp.status);
-      const passados = await resp.json().catch((e) => { console.error("[BOLÃO] Erro ao ler JSON:", e); return null; });
-      console.log("[BOLÃO] Resposta da API:", passados);
-      const eventos = passados?.events;
-      console.log("[BOLÃO] Eventos retornados:", Array.isArray(eventos) ? eventos.length : "nenhum (events =", eventos, ")");
-      const ar = {};
-      let comPlacar = 0, de2026 = 0;
-      if (Array.isArray(eventos)) {
-        for (const ev of eventos) {
-          if (ev.intHomeScore == null || ev.intHomeScore === "" || ev.intAwayScore == null || ev.intAwayScore === "") continue;
-          comPlacar++;
-          const dt = ev.dateEvent ? new Date(`${ev.dateEvent}T00:00:00Z`).getTime() : NaN;
-          if (isNaN(dt) || dt < new Date("2026-01-01T00:00:00Z").getTime()) continue;
-          de2026++;
-          const chave = chaveJogo(ev.strHomeTeam, ev.strAwayTeam);
-          console.log(`[BOLÃO] Jogo da API: ${ev.strHomeTeam} ${ev.intHomeScore}x${ev.intAwayScore} ${ev.strAwayTeam} (${ev.dateEvent}) → chave: ${chave}`);
-          ar[chave] = { casa: +ev.intHomeScore, fora: +ev.intAwayScore };
+      // 1) jogos passados/recentes (placares finais)
+      const passados = await fetch(urlPassados).then(r => r.json()).catch(() => null);
+      // 2) próximos/em andamento (pode trazer placar parcial ao vivo)
+      const proximos = await fetch(urlProximos).then(r => r.json()).catch(() => null);
+
+      const evPassados = Array.isArray(passados?.events) ? passados.events : [];
+      const evProximos = Array.isArray(proximos?.events) ? proximos.events : [];
+      console.log(`[BOLÃO] API: ${evPassados.length} passados, ${evProximos.length} próximos.`);
+
+      const limite2026 = new Date("2026-01-01T00:00:00Z").getTime();
+      const aoVivoStatus = new Set(["1H","2H","HT","ET","PEN","LIVE","Playing","In Progress"]);
+      const fimStatus = new Set(["FT","AET","Match Finished","Finished","AP"]);
+
+      const finais = {};   // vão para a tela E para o banco (permanentes)
+      const vivos = {};    // só para a tela (provisórios)
+
+      const processar = (ev) => {
+        if (ev.intHomeScore == null || ev.intHomeScore === "" || ev.intAwayScore == null || ev.intAwayScore === "") return;
+        const dt = ev.dateEvent ? new Date(`${ev.dateEvent}T00:00:00Z`).getTime() : NaN;
+        if (isNaN(dt) || dt < limite2026) return;
+        const chave = chaveJogo(ev.strHomeTeam, ev.strAwayTeam);
+        const placar = { casa: +ev.intHomeScore, fora: +ev.intAwayScore };
+        const status = (ev.strStatus || ev.strProgress || "").toString();
+        const terminou = fimStatus.has(status);
+        const emAndamento = aoVivoStatus.has(status);
+        if (terminou) {
+          finais[chave] = placar;
+        } else if (emAndamento) {
+          vivos[chave] = { ...placar, aoVivo: true };
+        } else {
+          // status desconhecido: se veio dos "passados", trata como final; senão, ignora
+          finais[chave] = placar;
         }
+      };
+      evPassados.forEach(processar);
+      evProximos.forEach(processar);
+
+      console.log(`[BOLÃO] ${Object.keys(finais).length} finalizados, ${Object.keys(vivos).length} ao vivo.`);
+
+      // tela: mescla tudo (finais + ao vivo), sem perder o que já existe
+      setApiResultados(prev => ({ ...prev, ...finais, ...vivos }));
+
+      // banco: grava só os FINALIZADOS que ainda não existem (nunca sobrescreve, nunca grava ao vivo)
+      try {
+        const { data: existentes } = await supabase.from("resultados_api").select("jogo_id");
+        const jaSalvos = new Set((existentes || []).map(r => r.jogo_id));
+        const novos = Object.entries(finais)
+          .filter(([chave]) => !jaSalvos.has(chave))
+          .map(([chave, v]) => ({ jogo_id: chave, casa: v.casa, fora: v.fora, atualizado_em: new Date().toISOString() }));
+        if (novos.length) {
+          await supabase.from("resultados_api").insert(novos);
+          console.log(`[BOLÃO] ${novos.length} resultado(s) final(is) salvo(s) no banco.`);
+        }
+      } catch (e) {
+        console.error("[BOLÃO] Erro ao salvar no banco:", e);
       }
-      console.log(`[BOLÃO] Resumo: ${comPlacar} com placar, ${de2026} de 2026+, ${Object.keys(ar).length} resultados prontos.`);
-      console.log("[BOLÃO] Chaves dos SEUS jogos:", JOGOS_OFICIAIS.map(j => chaveJogo(j.casa, j.fora)));
-      setApiResultados(ar);
-      setSyncStatus(Object.keys(ar).length ? "ok" : "sem-resultados");
+
+      const algumVivo = Object.keys(vivos).length > 0;
+      setSyncStatus(algumVivo ? "ao-vivo" : (Object.keys(finais).length ? "ok" : "sem-resultados"));
     } catch (e) {
       console.error("[BOLÃO] Falha na sincronização:", e);
       setSyncStatus("erro");
@@ -249,7 +292,7 @@ export default function App() {
   }
 
   const ranking = useMemo(() => {
-    return usuarios.map((jogador) => {
+    const linhas = usuarios.map((jogador) => {
       let total = 0, exatos = 0, jogados = 0;
       const pal = palpitesTodos[jogador] || {};
       for (const jg of jogos) {
@@ -259,7 +302,19 @@ export default function App() {
         if (p != null) { total += p; jogados++; if (ehExato(pal[jg.id], r)) exatos++; }
       }
       return { jogador, total, exatos, jogados };
-    }).sort((a, b) => b.total - a.total || b.exatos - a.exatos || a.jogador.localeCompare(b.jogador));
+    });
+    // ordena por total, depois por placares exatos; alfabético só p/ exibição estável
+    linhas.sort((a, b) => b.total - a.total || b.exatos - a.exatos || a.jogador.localeCompare(b.jogador));
+    // colocação: mesma pontuação E mesmos exatos = mesma posição (ex: 1º, 1º, 3º)
+    let posAtual = 0;
+    linhas.forEach((linha, i) => {
+      const ant = linhas[i - 1];
+      const empata = ant && ant.total === linha.total && ant.exatos === linha.exatos;
+      posAtual = empata ? posAtual : i + 1;
+      linha.pos = posAtual;
+      linha.empatado = empata || (linhas[i + 1] && linhas[i + 1].total === linha.total && linhas[i + 1].exatos === linha.exatos);
+    });
+    return linhas;
   }, [usuarios, palpitesTodos, jogos, resultadoFinal]);
 
   // jogos da rodada selecionada, agrupados por grupo
@@ -270,27 +325,38 @@ export default function App() {
     return Object.keys(g).sort().map(k => ({ grupo: k, jogos: g[k] }));
   }, [jogos, rodada]);
 
-  // todos os jogos agrupados por DIA, ordenados por data/horário
+  // data no fuso LOCAL do navegador, no formato YYYY-MM-DD (corrige o bug do fuso:
+  // um jogo 22h Brasília é 01h UTC do dia seguinte; aqui agrupamos pelo dia local correto)
+  const dataLocalChave = (d) => {
+    if (!d || isNaN(d)) return "sem-data";
+    const ano = d.getFullYear();
+    const mes = String(d.getMonth() + 1).padStart(2, "0");
+    const dia = String(d.getDate()).padStart(2, "0");
+    return `${ano}-${mes}-${dia}`;
+  };
+
+  // todos os jogos agrupados por DIA (no fuso local), ordenados por data/horário
   const porDia = useMemo(() => {
     const ordenados = [...jogos].sort((a, b) => (a.iso || "").localeCompare(b.iso || ""));
     const dias = {};
     for (const jg of ordenados) {
       const d = jg.iso ? new Date(jg.iso) : null;
-      const chave = d && !isNaN(d) ? d.toISOString().slice(0, 10) : "sem-data";
+      const chave = dataLocalChave(d);
       (dias[chave] = dias[chave] || []).push(jg);
     }
     return Object.keys(dias).sort().map(k => ({ dia: k, jogos: dias[k] }));
   }, [jogos]);
 
-  // rótulo amigável do dia (ex: "Sábado, 13/06")
+  // rótulo amigável do dia (ex: "Sábado, 13/06") — interpreta a chave como data local
   const labelDia = (chave) => {
     if (chave === "sem-data") return "Data a definir";
-    const d = new Date(`${chave}T12:00:00Z`);
+    const [a, m, dia] = chave.split("-").map(Number);
+    const d = new Date(a, m - 1, dia, 12, 0, 0); // meio-dia local, evita virada de fuso
     if (isNaN(d)) return chave;
     const txt = d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
     return txt.charAt(0).toUpperCase() + txt.slice(1);
   };
-  const hojeChave = new Date().toISOString().slice(0, 10);
+  const hojeChave = dataLocalChave(new Date());
 
   if (loading) return (
     <div style={{ ...S.app, display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
@@ -298,7 +364,7 @@ export default function App() {
     </div>
   );
 
-  const syncLabel = { sincronizando: "buscando resultados…", ok: "resultados atualizados", "sem-resultados": "aguardando 1º resultado", erro: "sem conexão", "": "" }[syncStatus];
+  const syncLabel = { sincronizando: "buscando resultados…", ok: "resultados atualizados", "ao-vivo": "🔴 jogo ao vivo — atualize para o placar mais recente", "sem-resultados": "aguardando 1º resultado", erro: "sem conexão", "": "" }[syncStatus];
 
   const Jogo = ({ jg, modo }) => {
     const p = meusPalpites[jg.id] || { casa: null, fora: null };
@@ -308,6 +374,8 @@ export default function App() {
     const pts = calcPontos(p, res);
     const m = resultadosManuais[jg.id] || { casa: null, fora: null };
     const a = apiResultados[chaveJogo(jg.casa, jg.fora)];
+    const temManual = m.casa != null && m.fora != null;
+    const aoVivo = !temManual && !!(a && a.aoVivo); // ao vivo só se o admin não fixou um placar
     const meuPreenchido = p.casa != null && p.fora != null;
     // palpites dos outros (só quando o jogo fechou) — usa dados já em memória
     const palpitesDoJogo = (modo === "palpite" && fechado)
@@ -321,6 +389,7 @@ export default function App() {
           <span style={S.dt}>{fmtData(jg.iso)}</span>
           <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {jg.semPontos && <span style={S.noPts}>não vale pontos</span>}
+            {aoVivo && <span style={S.liveTag}>🔴 AO VIVO</span>}
             {modo === "palpite" && !fechado && meuPreenchido && <span style={S.savedTag}>✓ salvo</span>}
             {modo === "palpite" && fechado && !tem && <span style={S.lock}>fechado</span>}
             {modo === "admin" && <span style={S.dt}>{a ? `API ${a.casa}×${a.fora}` : "API —"}</span>}
@@ -344,8 +413,8 @@ export default function App() {
           <span style={{ ...S.team, justifyContent: "flex-end", textAlign: "right" }}>{jg.fora}<span style={S.flag}>{bandeira(jg.fora)}</span></span>
         </div>
         {modo === "palpite" && tem && (
-          <div style={S.resLine}>Final {res.casa} × {res.fora}
-            <span style={{ ...S.badge, background: ehExato(p, res) ? C.green : pts > 0 ? C.gold : C.red }}>{pts != null ? `+${pts} pts` : "sem palpite"}</span>
+          <div style={S.resLine}>{aoVivo ? "Parcial" : "Final"} {res.casa} × {res.fora}
+            <span style={{ ...S.badge, background: ehExato(p, res) ? C.green : pts > 0 ? C.gold : C.red }}>{pts != null ? `${aoVivo ? "parcial " : ""}+${pts} pts` : "sem palpite"}</span>
           </div>
         )}
         {palpitesDoJogo.length > 0 && (
@@ -488,9 +557,9 @@ export default function App() {
               <div className="fade">
                 <p style={S.note}>Classificação geral · {ranking.length} participante(s)</p>
                 {ranking.length === 0 && <p style={S.empty}>Nenhum participante ainda.</p>}
-                {ranking.map((r, i) => (
+                {ranking.map((r) => (
                   <div key={r.jogador} style={{ ...S.rk, ...(r.jogador === nome ? S.rkMe : {}) }}>
-                    <span style={{ ...S.rkPos, ...(i < 3 ? S.rkPosTop : {}) }}>{i + 1}</span>
+                    <span style={{ ...S.rkPos, ...(r.pos <= 3 ? S.rkPosTop : {}) }}>{r.empatado ? `${r.pos}º=` : `${r.pos}º`}</span>
                     <span style={S.rkName}>{r.jogador}</span>
                     <span style={S.rkMeta}>{r.exatos} exatos · {r.jogados} jogos</span>
                     <span style={S.rkPts}>{r.total}</span>
@@ -631,6 +700,7 @@ const S = {
   lock: { color: C.red, fontSize: 9.5, fontWeight: 800, background: "#fbeae6", borderRadius: 6, padding: "2px 7px" },
   noPts: { color: C.inkSoft, fontSize: 9.5, fontWeight: 800, background: C.soft, borderRadius: 6, padding: "2px 7px" },
   savedTag: { color: C.green, fontSize: 9.5, fontWeight: 800, background: C.greenSoft, borderRadius: 6, padding: "2px 7px" },
+  liveTag: { color: C.white, fontSize: 9.5, fontWeight: 800, background: C.red, borderRadius: 6, padding: "2px 7px" },
   othersWrap: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}` },
   othersToggle: { width: "100%", background: C.soft, border: "none", borderRadius: 9, padding: "9px", color: C.greenDark, fontSize: 12, fontWeight: 800, cursor: "pointer" },
   othersList: { display: "flex", flexDirection: "column", gap: 4, marginTop: 8 },
@@ -649,7 +719,7 @@ const S = {
   badge: { marginLeft: "auto", color: C.white, fontSize: 11.5, fontWeight: 800, padding: "3px 10px", borderRadius: 20 },
   rk: { display: "flex", alignItems: "center", gap: 11, background: C.surface, border: `1px solid ${C.line}`, borderRadius: 13, padding: "11px 14px", marginBottom: 7, boxShadow: "0 2px 8px rgba(20,40,25,0.03)" },
   rkMe: { borderColor: C.green, boxShadow: `0 0 0 1.5px ${C.green}` },
-  rkPos: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 17, fontWeight: 800, width: 26, textAlign: "center", color: C.inkSoft },
+  rkPos: { fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 15, fontWeight: 800, width: 38, textAlign: "center", color: C.inkSoft },
   rkPosTop: { color: C.green },
   rkName: { fontWeight: 700, fontSize: 15 },
   rkMeta: { marginLeft: "auto", color: C.inkSoft, fontSize: 10.5, fontWeight: 600 },
