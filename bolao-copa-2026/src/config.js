@@ -16,7 +16,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ---- Outras configurações do bolão ----
 export const ADMIN_PASSWORD = "copa2026"; // senha do painel admin
-export const TRAVA_MINUTOS = 10;          // palpite fecha N min antes do jogo
+export const TRAVA_MINUTOS = 2;          // palpite fecha N min antes do jogo
 export const LEAGUE_ID = 4429;            // FIFA World Cup na TheSportsDB
 export const API_KEY = "123";             // chave pública gratuita
 export const PONTOS = { exato: 5, vencedor: 3, diferenca: 2, perdedor: 1 };
