@@ -76,8 +76,8 @@ export const JOGOS_OFICIAIS = [
   { id: "wc48", grupo: "K", rodada: 2, casa: "Colômbia",         fora: "RD Congo",             iso: "2026-06-24T02:00:00Z" },
 
   // ===== 3ª RODADA (jogos simultâneos por grupo) =====
-  { id: "wc49", grupo: "B", rodada: 3, casa: "Suíça",            fora: "Canadá",               iso: "2026-06-24T16:00:00Z" },
-  { id: "wc50", grupo: "B", rodada: 3, casa: "Bósnia e Herzegovina", fora: "Catar",            iso: "2026-06-24T16:00:00Z" },
+  { id: "wc49", grupo: "B", rodada: 3, casa: "Suíça",            fora: "Canadá",               iso: "2026-06-24T19:00:00Z" },
+  { id: "wc50", grupo: "B", rodada: 3, casa: "Bósnia e Herzegovina", fora: "Catar",            iso: "2026-06-24T19:00:00Z" },
   { id: "wc51", grupo: "C", rodada: 3, casa: "Escócia",          fora: "Brasil",               iso: "2026-06-24T22:00:00Z" },
   { id: "wc52", grupo: "C", rodada: 3, casa: "Marrocos",         fora: "Haiti",                iso: "2026-06-24T22:00:00Z" },
   { id: "wc53", grupo: "A", rodada: 3, casa: "República Tcheca", fora: "México",               iso: "2026-06-25T01:00:00Z" },
@@ -94,10 +94,10 @@ export const JOGOS_OFICIAIS = [
   { id: "wc64", grupo: "H", rodada: 3, casa: "Uruguai",          fora: "Espanha",              iso: "2026-06-27T00:00:00Z" },
   { id: "wc65", grupo: "G", rodada: 3, casa: "Egito",            fora: "Irã",                  iso: "2026-06-27T03:00:00Z" },
   { id: "wc66", grupo: "G", rodada: 3, casa: "Nova Zelândia",    fora: "Bélgica",              iso: "2026-06-27T03:00:00Z" },
-  { id: "wc67", grupo: "J", rodada: 3, casa: "Argélia",          fora: "Áustria",            iso: "2026-06-27T19:00:00Z" },
-  { id: "wc68", grupo: "J", rodada: 3, casa: "Jordânia",         fora: "Argentina",              iso: "2026-06-27T19:00:00Z" },
-  { id: "wc69", grupo: "K", rodada: 3, casa: "RD Congo",         fora: "Uzbequistão",             iso: "2026-06-27T22:00:00Z" },
-  { id: "wc70", grupo: "K", rodada: 3, casa: "Colômbia",         fora: "Portugal",          iso: "2026-06-27T22:00:00Z" },
-  { id: "wc71", grupo: "L", rodada: 3, casa: "Croácia",          fora: "Gana",                 iso: "2026-06-28T01:00:00Z" },
-  { id: "wc72", grupo: "L", rodada: 3, casa: "Panamá",           fora: "Inglaterra",           iso: "2026-06-28T01:00:00Z" },
+  { id: "wc67", grupo: "J", rodada: 3, casa: "Argélia",          fora: "Áustria",              iso: "2026-06-28T02:00:00Z" },
+  { id: "wc68", grupo: "J", rodada: 3, casa: "Jordânia",         fora: "Argentina",            iso: "2026-06-28T02:00:00Z" },
+  { id: "wc69", grupo: "K", rodada: 3, casa: "RD Congo",         fora: "Uzbequistão",          iso: "2026-06-27T23:30:00Z" },
+  { id: "wc70", grupo: "K", rodada: 3, casa: "Colômbia",         fora: "Portugal",             iso: "2026-06-27T23:30:00Z" },
+  { id: "wc71", grupo: "L", rodada: 3, casa: "Croácia",          fora: "Gana",                 iso: "2026-06-27T21:00:00Z" },
+  { id: "wc72", grupo: "L", rodada: 3, casa: "Panamá",           fora: "Inglaterra",           iso: "2026-06-27T21:00:00Z" },
 ];
