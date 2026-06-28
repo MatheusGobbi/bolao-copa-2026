@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase, ADMIN_PASSWORD, TRAVA_MINUTOS, LEAGUE_ID, API_KEY, PONTOS } from "./config";
 import { JOGOS_OFICIAIS, bandeira } from "./jogos";
+import { MATA_JOGOS, FASES_MATA, ROTULO_FASE_ORIGEM } from "./matamata";
 
 // Paleta clara — verde só como destaque
 const C = {
@@ -72,6 +73,8 @@ export default function App() {
   const [tab, setTab] = useState("palpites");
   const [rodada, setRodada] = useState(1);
   const [visao, setVisao] = useState("dia"); // "dia" (padrão) ou "grupo"
+  const [fase, setFase] = useState("grupos"); // "grupos" ou "mata"
+  const [mataAvancos, setMataAvancos] = useState({}); // { jogoId: "Time vencedor" }
   const [jogos, setJogos] = useState(JOGOS_OFICIAIS);
   const [resultadosManuais, setResultadosManuais] = useState({});
   const [apiResultados, setApiResultados] = useState({});
@@ -100,6 +103,45 @@ export default function App() {
     (jogoId, casa, fora) => resultadosManuais[jogoId] || apiResultados[chaveJogo(casa, fora)] || null,
     [resultadosManuais, apiResultados]
   );
+
+  // Resolve o mata-mata: descobre os times de cada confronto (diretos no R32,
+  // ou vindos dos vencedores nas fases seguintes) e quem venceu cada jogo.
+  const mataResolvido = useMemo(() => {
+    const porId = {};
+    // vencedor de um jogo: avanço confirmado pelo admin, OU placar que decide (não-empate)
+    const vencedorDe = (jg) => {
+      if (mataAvancos[jg.id]) return mataAvancos[jg.id]; // admin confirmou (cobre pênaltis)
+      const r = resultadosManuais[jg.id] || (jg.casa && jg.fora ? apiResultados[chaveJogo(jg.casa, jg.fora)] : null);
+      if (r && r.casa != null && r.fora != null && r.casa !== r.fora) {
+        return r.casa > r.fora ? jg.casa : jg.fora;
+      }
+      return null; // ainda não decidido (sem placar ou empate aguardando confirmação)
+    };
+    // primeira passada: R32 (times diretos)
+    for (const jg of MATA_JOGOS) {
+      if (jg.fase === "r32") porId[jg.id] = { ...jg };
+    }
+    // passadas seguintes: resolve os times a partir dos vencedores
+    for (const jg of MATA_JOGOS) {
+      if (jg.fase === "r32") continue;
+      const oc = porId[jg.deCasa], of = porId[jg.deFora];
+      const vc = oc ? vencedorDe(oc) : null;
+      const vf = of ? vencedorDe(of) : null;
+      porId[jg.id] = {
+        ...jg,
+        casa: vc || null,
+        fora: vf || null,
+        origemCasaFase: oc?.fase,
+        origemForaFase: of?.fase,
+      };
+    }
+    // calcula o vencedor de cada um (para exibição e avanço)
+    for (const id of Object.keys(porId)) porId[id].vencedor = vencedorDe(porId[id]);
+    return porId;
+  }, [mataAvancos, resultadosManuais, apiResultados]);
+
+  // lista de jogos do mata-mata, com times resolvidos, na ordem definida
+  const mataJogos = useMemo(() => MATA_JOGOS.map(j => mataResolvido[j.id]).filter(Boolean), [mataResolvido]);
 
   const carregarBanco = useCallback(async () => {
     const { data: jg } = await supabase.from("jogos").select("*").order("ordem", { ascending: true });
@@ -134,12 +176,19 @@ export default function App() {
       for (const r of rapi) if (r.casa != null && r.fora != null) a[r.jogo_id] = { casa: r.casa, fora: r.fora };
       setApiResultados(prev => ({ ...a, ...prev })); // mantém o que já estava em memória por cima
     }
+    // avanços do mata-mata (quem passou em cada confronto)
+    const { data: mav } = await supabase.from("mata_avancos").select("*");
+    if (mav) {
+      const m = {};
+      for (const r of mav) if (r.vencedor) m[r.jogo_id] = r.vencedor;
+      setMataAvancos(m);
+    }
   }, []);
 
   const sincronizar = useCallback(async () => {
     setSyncStatus("sincronizando");
-    const urlPassados = `${API_BASE}/eventspastleague.php?id=${LEAGUE_ID}`;
-    const urlProximos = `${API_BASE}/eventsnextleague.php?id=${LEAGUE_ID}`;
+    const urlPassados = `/api/sportsdb?tipo=past`;
+    const urlProximos = `/api/sportsdb?tipo=next`;
     console.log("[BOLÃO] Sincronizando…");
     try {
       // 1) jogos passados/recentes (placares finais)
@@ -291,12 +340,30 @@ export default function App() {
     else await supabase.from("resultados_manuais").upsert({ jogo_id: jogoId, casa: novo.casa, fora: novo.fora, atualizado_em: new Date().toISOString() }, { onConflict: "jogo_id" });
   }
 
+  // admin confirma quem avançou num jogo do mata-mata (necessário em pênaltis)
+  async function confirmarAvanco(jogoId, vencedor) {
+    setMataAvancos(m => {
+      const novo = { ...m };
+      if (vencedor) novo[jogoId] = vencedor; else delete novo[jogoId];
+      return novo;
+    });
+    if (vencedor) await supabase.from("mata_avancos").upsert({ jogo_id: jogoId, vencedor, atualizado_em: new Date().toISOString() }, { onConflict: "jogo_id" });
+    else await supabase.from("mata_avancos").delete().eq("jogo_id", jogoId);
+  }
+
   const ranking = useMemo(() => {
     const linhas = usuarios.map((jogador) => {
       let total = 0, exatos = 0, jogados = 0;
       const pal = palpitesTodos[jogador] || {};
       for (const jg of jogos) {
         if (jg.semPontos) continue; // jogos de abertura não contam
+        const r = resultadoFinal(jg.id, jg.casa, jg.fora);
+        const p = calcPontos(pal[jg.id], r);
+        if (p != null) { total += p; jogados++; if (ehExato(pal[jg.id], r)) exatos++; }
+      }
+      // jogos do mata-mata (mesma pontuação)
+      for (const jg of mataJogos) {
+        if (!jg.casa || !jg.fora) continue; // confronto ainda não definido
         const r = resultadoFinal(jg.id, jg.casa, jg.fora);
         const p = calcPontos(pal[jg.id], r);
         if (p != null) { total += p; jogados++; if (ehExato(pal[jg.id], r)) exatos++; }
@@ -315,7 +382,7 @@ export default function App() {
       linha.empatado = empata || (linhas[i + 1] && linhas[i + 1].total === linha.total && linhas[i + 1].exatos === linha.exatos);
     });
     return linhas;
-  }, [usuarios, palpitesTodos, jogos, resultadoFinal]);
+  }, [usuarios, palpitesTodos, jogos, resultadoFinal, mataJogos]);
 
   // jogos da rodada selecionada, agrupados por grupo
   const porGrupo = useMemo(() => {
@@ -444,11 +511,118 @@ export default function App() {
     );
   };
 
+  // Componente de jogo do MATA-MATA (lida com times "a definir" e avanço no admin)
+  const JogoMata = ({ jg, modo }) => {
+    const definido = !!(jg.casa && jg.fora);
+    const rotuloCasa = jg.casa || `Vencedor ${ROTULO_FASE_ORIGEM[jg.origemCasaFase] || "fase anterior"}`;
+    const rotuloFora = jg.fora || `Vencedor ${ROTULO_FASE_ORIGEM[jg.origemForaFase] || "fase anterior"}`;
+    const p = meusPalpites[jg.id] || { casa: null, fora: null };
+    const res = definido ? resultadoFinal(jg.id, jg.casa, jg.fora) : null;
+    const fechado = definido ? jogoFechado(jg, res) : true;
+    const tem = res && res.casa != null && res.fora != null;
+    const pts = calcPontos(p, res);
+    const m = resultadosManuais[jg.id] || { casa: null, fora: null };
+    const a = definido ? apiResultados[chaveJogo(jg.casa, jg.fora)] : null;
+    const temManual = m.casa != null && m.fora != null;
+    const aoVivo = !temManual && !!(a && a.aoVivo);
+    const meuPreenchido = p.casa != null && p.fora != null;
+    const encerrado = tem && !aoVivo;
+    const empatePlacar = tem && res.casa === res.fora;
+    const palpitesDoJogo = (modo === "palpite" && fechado && definido)
+      ? usuarios.map(u => ({ u, pal: palpitesTodos[u]?.[jg.id] })).filter(o => o.pal && o.pal.casa != null && o.pal.fora != null)
+      : [];
+    return (
+      <div style={{ ...S.match, ...(encerrado ? S.matchEncerrado : {}), ...(aoVivo ? S.matchAoVivo : {}), ...(!definido ? S.matchPendente : {}) }}>
+        <div style={S.mTop}>
+          <span style={S.dt}>{fmtData(jg.iso)}</span>
+          <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {aoVivo && <span style={S.liveTag}>🔴 AO VIVO</span>}
+            {encerrado && <span style={S.encerradoTag}>encerrado</span>}
+            {!definido && <span style={S.pendenteTag}>aguardando times</span>}
+            {modo === "palpite" && definido && !fechado && meuPreenchido && <span style={S.savedTag}>✓ salvo</span>}
+            {modo === "palpite" && definido && fechado && !tem && <span style={S.lock}>fechado</span>}
+          </span>
+        </div>
+        <div style={S.mRow}>
+          <span style={S.team}><span style={S.flag}>{definido ? bandeira(jg.casa) : "⏳"}</span>{rotuloCasa}</span>
+          {modo === "palpite" && (<>
+            <input type="number" min="0" style={{ ...S.sc, opacity: (fechado || !definido) ? .45 : 1 }} value={p.casa ?? ""} disabled={fechado || !definido} onChange={e => salvarPalpite(jg.id, "casa", e.target.value)} />
+            <span style={S.x}>×</span>
+            <input type="number" min="0" style={{ ...S.sc, opacity: (fechado || !definido) ? .45 : 1 }} value={p.fora ?? ""} disabled={fechado || !definido} onChange={e => salvarPalpite(jg.id, "fora", e.target.value)} />
+          </>)}
+          {modo === "resultado" && (<>
+            <span style={S.scShow}>{tem ? res.casa : "–"}</span><span style={S.x}>×</span><span style={S.scShow}>{tem ? res.fora : "–"}</span>
+          </>)}
+          {modo === "admin" && (<>
+            <input type="number" min="0" style={{ ...S.sc, opacity: definido ? 1 : .4 }} value={m.casa ?? ""} placeholder="–" disabled={!definido} onChange={e => salvarResultadoManual(jg.id, "casa", e.target.value)} />
+            <span style={S.x}>×</span>
+            <input type="number" min="0" style={{ ...S.sc, opacity: definido ? 1 : .4 }} value={m.fora ?? ""} placeholder="–" disabled={!definido} onChange={e => salvarResultadoManual(jg.id, "fora", e.target.value)} />
+          </>)}
+          <span style={{ ...S.team, justifyContent: "flex-end", textAlign: "right" }}>{rotuloFora}<span style={S.flag}>{definido ? bandeira(jg.fora) : "⏳"}</span></span>
+        </div>
+
+        {modo === "palpite" && tem && (
+          <div style={S.resLine}>{aoVivo ? "Parcial" : "Final"} {res.casa} × {res.fora}
+            <span style={{ ...S.badge, background: ehExato(p, res) ? C.green : pts > 0 ? C.gold : C.red }}>{pts != null ? `${aoVivo ? "parcial " : ""}+${pts} pts` : "sem palpite"}</span>
+          </div>
+        )}
+
+        {definido && (jg.vencedor || modo === "admin") && (
+          <div style={S.avancoWrap}>
+            {jg.vencedor && <span style={S.avancoInfo}>✓ avança: <b>{jg.vencedor}</b></span>}
+            {modo === "admin" && (
+              <div style={S.avancoBtns}>
+                <span style={S.avancoLbl}>{empatePlacar ? "Empate — quem passou?" : "Quem avança:"}</span>
+                <button style={{ ...S.avancoBtn, ...(jg.vencedor === jg.casa ? S.avancoOn : {}) }} onClick={() => confirmarAvanco(jg.id, jg.casa)}>{jg.casa}</button>
+                <button style={{ ...S.avancoBtn, ...(jg.vencedor === jg.fora ? S.avancoOn : {}) }} onClick={() => confirmarAvanco(jg.id, jg.fora)}>{jg.fora}</button>
+                {jg.vencedor && <button style={S.avancoLimpar} onClick={() => confirmarAvanco(jg.id, null)}>limpar</button>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {palpitesDoJogo.length > 0 && (
+          <div style={S.othersWrap}>
+            <button style={S.othersToggle} onClick={() => setPalpitesAbertos(s => ({ ...s, [jg.id]: !s[jg.id] }))}>
+              {palpitesAbertos[jg.id] ? "▲ ocultar palpites" : `▼ ver palpites dos participantes (${palpitesDoJogo.length})`}
+            </button>
+            {palpitesAbertos[jg.id] && (
+              <div style={S.othersList}>
+                {palpitesDoJogo.map(({ u, pal }) => {
+                  const ap = tem ? calcPontos(pal, res) : null;
+                  return (
+                    <div key={u} style={{ ...S.otherRow, ...(u === nome ? S.otherMe : {}) }}>
+                      <span style={S.otherName}>{u}</span>
+                      <span style={S.otherScore}>{pal.casa} × {pal.fora}</span>
+                      {tem && ap != null && <span style={{ ...S.otherPts, color: ehExato(pal, res) ? C.green : ap > 0 ? C.gold : C.inkSoft }}>+{ap}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // primeiro dia (>= hoje) com jogos, para marcar o alvo do auto-scroll
   const proximoDiaComJogos = porDia.find(d => d.dia >= hojeChave)?.dia || (porDia[porDia.length - 1]?.dia);
 
   // renderiza os jogos conforme a visão escolhida (grupo ou dia)
   const renderConteudo = (modo) => {
+    if (fase === "mata") {
+      return FASES_MATA.map(f => {
+        const js = mataJogos.filter(j => j.fase === f.id);
+        if (!js.length) return null;
+        return (
+          <div key={f.id}>
+            <div style={S.groupHead}>{f.nome}</div>
+            {js.map(jg => <JogoMata key={jg.id} jg={jg} modo={modo} />)}
+          </div>
+        );
+      });
+    }
     if (visao === "dia") {
       return porDia.map(({ dia, jogos: js }) => {
         const ehHoje = dia === hojeChave;
@@ -531,17 +705,25 @@ export default function App() {
 
           {(tab === "palpites" || tab === "resultados" || tab === "admin") && (
             <>
-              <div style={S.ordenarBar}>
-                <span style={S.ordenarLbl}>Ordenar jogos:</span>
-                <button onClick={() => setVisao("dia")} style={{ ...S.visaoBtn, ...(visao === "dia" ? S.visaoOn : {}) }}>📅 Por dia</button>
-                <button onClick={() => setVisao("grupo")} style={{ ...S.visaoBtn, ...(visao === "grupo" ? S.visaoOn : {}) }}>🏆 Por grupo</button>
+              <div style={S.faseBar}>
+                <button onClick={() => setFase("grupos")} style={{ ...S.faseBtn, ...(fase === "grupos" ? S.faseOn : {}) }}>Fase de grupos</button>
+                <button onClick={() => setFase("mata")} style={{ ...S.faseBtn, ...(fase === "mata" ? S.faseOn : {}) }}>Mata-mata</button>
               </div>
-              {visao === "grupo" && (
-                <div style={S.rodadaBar}>
-                  {[1,2,3].map(r => (
-                    <button key={r} onClick={() => setRodada(r)} style={{ ...S.rodadaBtn, ...(rodada === r ? S.rodadaOn : {}) }}>{r}ª rodada</button>
-                  ))}
-                </div>
+              {fase === "grupos" && (
+                <>
+                  <div style={S.ordenarBar}>
+                    <span style={S.ordenarLbl}>Ordenar jogos:</span>
+                    <button onClick={() => setVisao("dia")} style={{ ...S.visaoBtn, ...(visao === "dia" ? S.visaoOn : {}) }}>📅 Por dia</button>
+                    <button onClick={() => setVisao("grupo")} style={{ ...S.visaoBtn, ...(visao === "grupo" ? S.visaoOn : {}) }}>🏆 Por grupo</button>
+                  </div>
+                  {visao === "grupo" && (
+                    <div style={S.rodadaBar}>
+                      {[1,2,3].map(r => (
+                        <button key={r} onClick={() => setRodada(r)} style={{ ...S.rodadaBtn, ...(rodada === r ? S.rodadaOn : {}) }}>{r}ª rodada</button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -696,6 +878,18 @@ const S = {
   userbar: { display: "flex", alignItems: "center", padding: "4px 18px 8px", fontSize: 14 },
   ghost: { marginLeft: "auto", background: "transparent", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 8, padding: "4px 12px", fontSize: 12, cursor: "pointer", fontWeight: 600 },
   ordenarBar: { display: "flex", gap: 6, padding: "0 14px 8px", alignItems: "center" },
+  faseBar: { display: "flex", gap: 0, padding: "0 14px 10px" },
+  faseBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, padding: "10px 6px", fontSize: 13.5, fontWeight: 800, cursor: "pointer" },
+  faseOn: { background: C.green, color: C.white, borderColor: C.green },
+  matchPendente: { opacity: 0.78, borderStyle: "dashed" },
+  pendenteTag: { color: C.inkSoft, fontSize: 9.5, fontWeight: 800, background: C.soft, borderRadius: 6, padding: "2px 7px" },
+  avancoWrap: { marginTop: 9, paddingTop: 9, borderTop: `1px solid ${C.line}`, display: "flex", flexDirection: "column", gap: 6 },
+  avancoInfo: { fontSize: 12.5, color: C.greenDark, fontWeight: 600 },
+  avancoBtns: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" },
+  avancoLbl: { fontSize: 11, color: C.inkSoft, fontWeight: 700, width: "100%" },
+  avancoBtn: { background: C.soft, border: `1px solid ${C.line}`, color: C.ink, borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" },
+  avancoOn: { background: C.greenSoft, borderColor: C.green, color: C.greenDark },
+  avancoLimpar: { background: "transparent", border: "none", color: C.red, fontSize: 11, fontWeight: 700, cursor: "pointer", marginLeft: "auto" },
   ordenarLbl: { fontSize: 11.5, color: C.inkSoft, fontWeight: 700, marginRight: 2, whiteSpace: "nowrap" },
   visaoBar: { display: "flex", gap: 6, padding: "0 14px 8px" },
   visaoBtn: { flex: 1, background: C.surface, border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 9, padding: "8px 6px", fontSize: 12.5, fontWeight: 800, cursor: "pointer" },
